@@ -1,15 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, Modal, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Clock, Plus, CircleCheck as CheckCircle2, Circle, Zap, Target, Flame, Trophy, Sword, Crown, Mail, Sparkles } from 'lucide-react-native';
+import { Settings, Clock, Plus, CircleCheck as CheckCircle2, Circle, Zap, Target, Flame, Trophy, Sword, Crown, Mail, Sparkles, Trash2, RotateCcw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Task, UserStats } from '@/types/app';
 import { getTasks, getUserStats, completeTask } from '@/utils/storage';
 import ProgressBar from '@/components/ProgressBar';
 import GlowingButton from '@/components/GlowingButton';
 import { scale, scaleFont } from '../../utils/config';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import InboxScreen from '../inbox';
+
+// Add DailyTask type
+interface DailyTask {
+  id: string;
+  title: string;
+  completed: boolean;
+  xpReward: number;
+  completedAt?: string;
+  canUndo?: boolean;
+  undoExpiresAt?: string;
+}
 
 export default function HubScreen() {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [userStats, setUserStats] = useState<UserStats>({
     level: 1,
     currentXP: 0,
@@ -25,7 +42,22 @@ export default function HubScreen() {
   const [completedQuests, setCompletedQuests] = useState<Task[]>([]);
   const [incompleteTasks, setIncompleteTasks] = useState<Task[]>([]);
   const [timeLeft, setTimeLeft] = useState('23:45:12');
-  const [unreadMessages] = useState(3);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [personalTodos, setPersonalTodos] = useState([
+    { id: '1', title: 'Review project proposal', completed: false },
+    { id: '2', title: 'Call mom', completed: false },
+    { id: '3', title: 'Plan weekend activities', completed: false },
+  ]);
+  const [showAddTodoModal, setShowAddTodoModal] = useState(false);
+  const [newTodoText, setNewTodoText] = useState('');
+  const [showAllTodosModal, setShowAllTodosModal] = useState(false);
+  const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([
+    { id: '1', title: 'Drink 8 glasses of water', completed: false, xpReward: 25 },
+    { id: '2', title: 'Get 15 minutes of sunlight', completed: false, xpReward: 30 },
+    { id: '3', title: 'Write a journal entry', completed: false, xpReward: 50 },
+    { id: '4', title: 'Practice gratitude', completed: false, xpReward: 35 },
+  ]);
+  const [undoTimers, setUndoTimers] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     loadData();
@@ -43,8 +75,50 @@ export default function HubScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnreadCount = async () => {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('type', 'system')
+        .eq('is_read', false);
+      if (!error && typeof count === 'number') {
+        setUnreadMessages(count);
+      }
+    };
+    fetchUnreadCount();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchProfile = async () => {
+      setLoadingProfile(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      if (!error && data) {
+        setProfile(data);
+        setUserStats({
+          level: data.level,
+          currentXP: data.current_xp,
+          totalXP: data.total_xp,
+          xpToNextLevel: (data.level * 1000) - (data.total_xp % 1000),
+          tasksCompleted: data.tasks_completed,
+          goalsCompleted: data.goals_completed,
+          streak: data.streak,
+          title: data.title,
+        });
+      }
+      setLoadingProfile(false);
+    };
+    fetchProfile();
+  }, [user]);
+
   const loadData = () => {
-    setUserStats(getUserStats());
     const tasks = getTasks();
     setAllTasks(tasks);
     setCompletedQuests(tasks.filter(task => task.isCompleted).slice(0, 5));
@@ -54,6 +128,26 @@ export default function HubScreen() {
   const handleCompleteTask = (taskId: string) => {
     completeTask(taskId);
     loadData();
+  };
+
+  const togglePersonalTodo = (todoId: string) => {
+    setPersonalTodos(prev => prev.map(todo =>
+      todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
+    ));
+  };
+
+  const deletePersonalTodo = (todoId: string) => {
+    setPersonalTodos(prev => prev.filter(todo => todo.id !== todoId));
+  };
+
+  const handleAddTodo = () => {
+    if (newTodoText.trim() === '') return;
+    setPersonalTodos(prev => [
+      ...prev,
+      { id: Date.now().toString(), title: newTodoText.trim(), completed: false },
+    ]);
+    setNewTodoText('');
+    setShowAddTodoModal(false);
   };
 
   const getUserTitle = (level: number): string => {
@@ -96,8 +190,117 @@ export default function HubScreen() {
     return 'E';
   };
 
-  const completedDailyTasks = completedQuests.length;
+  const completedDailyTasks = dailyTasks.filter(task => task.completed).length;
+  const totalDailyTasks = dailyTasks.length;
   const completedPersonalTodos = completedQuests.length;
+
+  const toggleDailyTask = (taskId: string) => {
+    setDailyTasks(prev => {
+      const updatedTasks = prev.map(task => {
+        if (task.id === taskId) {
+          if (!task.completed) {
+            // Completing the task
+            const newStats = { ...userStats };
+            newStats.currentXP += task.xpReward;
+            newStats.totalXP += task.xpReward;
+            // Level up logic
+            const newLevel = Math.floor(newStats.totalXP / 1000) + 1;
+            if (newLevel > newStats.level) {
+              newStats.level = newLevel;
+              newStats.title = getUserTitle(newStats.level);
+            }
+            newStats.xpToNextLevel = (newStats.level * 1000) - (newStats.totalXP % 1000);
+            setUserStats(newStats);
+            const undoExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+            setUndoTimers(prevTimers => ({ ...prevTimers, [task.id]: '5:00' }));
+            return {
+              ...task,
+              completed: true,
+              completedAt: new Date().toISOString(),
+              canUndo: true,
+              undoExpiresAt: undoExpiresAt.toISOString(),
+            };
+          } else if (task.canUndo) {
+            // Undoing the task
+            const newStats = { ...userStats };
+            newStats.currentXP -= task.xpReward;
+            newStats.totalXP -= task.xpReward;
+            // Level down logic
+            const newLevel = Math.floor(newStats.totalXP / 1000) + 1;
+            if (newLevel < newStats.level) {
+              newStats.level = newLevel;
+              newStats.title = getUserTitle(newStats.level);
+            }
+            newStats.xpToNextLevel = (newStats.level * 1000) - (newStats.totalXP % 1000);
+            setUserStats(newStats);
+            setUndoTimers(prevTimers => {
+              const newTimers = { ...prevTimers };
+              delete newTimers[task.id];
+              return newTimers;
+            });
+            return {
+              ...task,
+              completed: false,
+              completedAt: undefined,
+              canUndo: false,
+              undoExpiresAt: undefined,
+            };
+          }
+        }
+        return task;
+      });
+      return updatedTasks;
+    });
+  };
+
+  const undoDailyTask = (taskId: string) => {
+    const task = dailyTasks.find(t => t.id === taskId);
+    if (task && task.completed && task.canUndo) {
+      const now = new Date();
+      const undoExpiresAt = new Date(task.undoExpiresAt || 0);
+      if (now < undoExpiresAt) {
+        toggleDailyTask(taskId);
+        // Optionally show a toast/alert
+      }
+    }
+  };
+
+  const isUndoTimeRunningOut = (taskId: string) => {
+    const timer = undoTimers[taskId];
+    if (!timer) return false;
+    const [minutes, seconds] = timer.split(':').map(Number);
+    return minutes === 0 && seconds < 30;
+  };
+
+  const getUndoButtonStyle = (taskId: string) => {
+    const baseStyle = { borderWidth: 1, borderColor: '#f59e0b', borderRadius: 6, flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 };
+    if (isUndoTimeRunningOut(taskId)) {
+      return { ...baseStyle, borderColor: '#ef4444', backgroundColor: '#ef444420' };
+    }
+    return baseStyle;
+  };
+
+  const getUndoTimerTextStyle = (taskId: string) => {
+    const baseStyle = { color: '#f59e0b', fontSize: 12, marginLeft: 4 };
+    if (isUndoTimeRunningOut(taskId)) {
+      return { ...baseStyle, color: '#ef4444' };
+    }
+    return baseStyle;
+  };
+
+  // When stats change, update Supabase
+  const updateProfileStats = async (stats: Partial<UserStats>) => {
+    if (!user) return;
+    await supabase.from('profiles').update({
+      level: stats.level,
+      current_xp: stats.currentXP,
+      total_xp: stats.totalXP,
+      tasks_completed: stats.tasksCompleted,
+      goals_completed: stats.goalsCompleted,
+      streak: stats.streak,
+      title: stats.title,
+    }).eq('id', user.id);
+  };
 
   return (
     <View style={styles.container}>
@@ -139,7 +342,7 @@ export default function HubScreen() {
               <View style={styles.cardContent}>
                 {/* Left Side - Info */}
                 <View style={styles.leftSection}>
-                  <Text style={styles.username}>Shadow Walker</Text>
+                  <Text style={styles.username}>{profile?.username}</Text>
                   <Text style={styles.hunterCode}>ID: HNT-2024-001</Text>
                   
                   <View style={styles.infoGrid}>
@@ -226,10 +429,10 @@ export default function HubScreen() {
                     </Text>
                     <View style={styles.questProgress}>
                       <Text style={styles.questProgressText}>
-                        Progress: {completedDailyTasks}/{incompleteTasks.filter(t => t.questType === 'system' && !t.isCompleted).length}
+                        Progress: {completedDailyTasks}/{totalDailyTasks}
                       </Text>
                       <ProgressBar 
-                        progress={completedDailyTasks / incompleteTasks.filter(t => t.questType === 'system' && !t.isCompleted).length} 
+                        progress={totalDailyTasks === 0 ? 0 : completedDailyTasks / totalDailyTasks} 
                         height={6}
                         glowColor="#10b981"
                       />
@@ -242,29 +445,43 @@ export default function HubScreen() {
             {/* Daily Tasks */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Daily Tasks</Text>
-              
               <View style={styles.tasksContainer}>
-                {incompleteTasks.map(task => (
-                  <TouchableOpacity
-                    key={task.id}
-                    style={[styles.taskItem, task.isCompleted && styles.completedTask]}
-                    onPress={() => handleCompleteTask(task.id)}
-                  >
-                    <View style={styles.taskLeft}>
-                      {task.isCompleted ? (
+                {dailyTasks.map(task => (
+                  <View key={task.id} style={[styles.taskItem, task.completed && styles.completedTask]}> 
+                    <TouchableOpacity
+                      style={styles.taskLeft}
+                      onPress={() => toggleDailyTask(task.id)}
+                    >
+                      {task.completed ? (
                         <CheckCircle2 size={20} color="#10b981" />
                       ) : (
                         <Circle size={20} color="#6b7280" />
                       )}
-                      <Text style={[styles.taskText, task.isCompleted && styles.completedTaskText]}>
+                      <Text style={[styles.taskText, task.completed && styles.completedTaskText]}>
                         {task.title}
                       </Text>
+                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={styles.xpBadge}>
+                        <Zap size={12} color="#fbbf24" />
+                        <Text style={styles.xpBadgeText}>{task.xpReward}</Text>
+                      </View>
+                      {task.completed && task.canUndo && (
+                        <TouchableOpacity
+                          style={getUndoButtonStyle(task.id)}
+                          onPress={() => undoDailyTask(task.id)}
+                        >
+                          <RotateCcw 
+                            size={14} 
+                            color={isUndoTimeRunningOut(task.id) ? '#ef4444' : '#f59e0b'} 
+                          />
+                          <Text style={getUndoTimerTextStyle(task.id)}>
+                            {undoTimers[task.id] || '5:00'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    <View style={styles.xpBadge}>
-                      <Zap size={12} color="#fbbf24" />
-                      <Text style={styles.xpBadgeText}>{task.xpReward}</Text>
-                    </View>
-                  </TouchableOpacity>
+                  </View>
                 ))}
               </View>
             </View>
@@ -273,27 +490,40 @@ export default function HubScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>To Do</Text>
-                <TouchableOpacity style={styles.addButton}>
-                  <Plus size={20} color="#6366f1" />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.todosContainer}>
-                {completedQuests.map(quest => (
-                  <TouchableOpacity
-                    key={quest.id}
-                    style={[styles.todoItem, quest.isCompleted && styles.completedTodo]}
-                    onPress={() => handleCompleteTask(quest.id)}
-                  >
-                    {quest.isCompleted ? (
-                      <CheckCircle2 size={20} color="#00ffff" />
-                    ) : (
-                      <Circle size={20} color="#6b7280" />
-                    )}
-                    <Text style={[styles.todoText, quest.isCompleted && styles.completedTodoText]}>
-                      {quest.title}
-                    </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {personalTodos.length > 5 && (
+                    <TouchableOpacity onPress={() => setShowAllTodosModal(true)} style={{ marginRight: 12 }}>
+                      <Text style={styles.viewAllText}>View All</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={styles.addButton} onPress={() => setShowAddTodoModal(true)}>
+                    <Plus size={20} color="#6366f1" />
                   </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.todosContainer}>
+                {personalTodos.map(todo => (
+                  <View
+                    key={todo.id}
+                    style={[styles.todoItem, todo.completed && styles.completedTodo, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                  >
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                      onPress={() => togglePersonalTodo(todo.id)}
+                    >
+                      {todo.completed ? (
+                        <CheckCircle2 size={20} color="#00ffff" />
+                      ) : (
+                        <Circle size={20} color="#6b7280" />
+                      )}
+                      <Text style={[styles.todoText, todo.completed && styles.completedTodoText]}>
+                        {todo.title}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => deletePersonalTodo(todo.id)} style={{ padding: 8 }}>
+                      <Trash2 size={18} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </View>
             </View>
@@ -386,6 +616,76 @@ export default function HubScreen() {
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
+      <Modal
+        visible={showAddTodoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAddTodoModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#1f2937', padding: 24, borderRadius: 12, width: '80%' }}>
+            <Text style={{ color: '#fff', fontSize: 18, marginBottom: 12 }}>Add New To-Do</Text>
+            <TextInput
+              value={newTodoText}
+              onChangeText={setNewTodoText}
+              placeholder="Enter to-do..."
+              placeholderTextColor="#9ca3af"
+              style={{ backgroundColor: '#111827', color: '#fff', borderRadius: 8, padding: 10, marginBottom: 16 }}
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+              <TouchableOpacity onPress={() => setShowAddTodoModal(false)} style={{ padding: 8 }}>
+                <Text style={{ color: '#9ca3af', fontSize: 16 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleAddTodo} style={{ padding: 8 }}>
+                <Text style={{ color: '#00ffff', fontSize: 16 }}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={showAllTodosModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAllTodosModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#1f2937', padding: 24, borderRadius: 12, width: '90%', maxHeight: '80%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Orbitron-Bold' }}>All To-Dos</Text>
+              <TouchableOpacity onPress={() => setShowAllTodosModal(false)} style={{ padding: 8 }}>
+                <Text style={{ color: '#00ffff', fontSize: 16 }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {personalTodos.map(todo => (
+                <View
+                  key={todo.id}
+                  style={[styles.todoItem, todo.completed && styles.completedTodo, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                >
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                    onPress={() => togglePersonalTodo(todo.id)}
+                  >
+                    {todo.completed ? (
+                      <CheckCircle2 size={20} color="#00ffff" />
+                    ) : (
+                      <Circle size={20} color="#6b7280" />
+                    )}
+                    <Text style={[styles.todoText, todo.completed && styles.completedTodoText]}>
+                      {todo.title}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deletePersonalTodo(todo.id)} style={{ padding: 8 }}>
+                    <Trash2 size={18} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

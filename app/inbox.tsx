@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { X, Mail, Users, Shield, Settings as SettingsIcon, Crown, MessageCircle, Clock, Check, Trash2 } from 'lucide-react-native';
 import GlowingButton from '@/components/GlowingButton';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 type MessageType = 'system' | 'guild' | 'friend';
 type MessageCategory = 'all' | 'friend' | 'guild' | 'system';
@@ -19,67 +21,47 @@ interface Message {
   senderAvatar?: string;
 }
 
-export default function InboxScreen() {
+export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () => void } = {}) {
+  const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState<MessageCategory>('all');
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'system',
-      title: 'Welcome to LevelUpLife!',
-      content: 'Congratulations on starting your journey! Complete your first daily quest to earn bonus XP. Remember, consistency is key to becoming stronger.',
-      timestamp: '2 hours ago',
-      isRead: false,
-    },
-    {
-      id: '2',
-      type: 'guild',
-      title: 'Guild Quest Available',
-      content: 'A new guild quest "Collective Growth Challenge" is now available. Work together with your guild members to complete it and earn exclusive rewards!',
-      timestamp: '4 hours ago',
-      isRead: false,
-      sender: 'Rising Phoenix Guild',
-    },
-    {
-      id: '3',
-      type: 'friend',
-      title: 'Friend Request',
-      content: 'DragonSlayer99 wants to be your friend! They\'re a B-Rank Guardian with impressive stats.',
-      timestamp: '6 hours ago',
-      isRead: true,
-      sender: 'DragonSlayer99',
-      senderAvatar: 'https://images.pexels.com/photos/8721318/pexels-photo-8721318.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&fit=crop',
-    },
-    {
-      id: '4',
-      type: 'system',
-      title: 'Level Up Achievement!',
-      content: 'Congratulations! You\'ve reached Level 25 and earned the title "A-Rank Warrior". Your power level has increased significantly!',
-      timestamp: '1 day ago',
-      isRead: true,
-    },
-    {
-      id: '5',
-      type: 'guild',
-      title: 'Guild Rank Promotion',
-      content: 'You have been promoted to Vice Captain in Rising Phoenix guild! You now have additional permissions and responsibilities.',
-      timestamp: '2 days ago',
-      isRead: true,
-      sender: 'Rising Phoenix Guild',
-    },
-    {
-      id: '6',
-      type: 'friend',
-      title: 'Challenge Invitation',
-      content: 'ShadowNinja has challenged you to a weekly quest competition! Accept to see who can complete more quests this week.',
-      timestamp: '3 days ago',
-      isRead: false,
-      sender: 'ShadowNinja',
-      senderAvatar: 'https://images.pexels.com/photos/8090140/pexels-photo-8090140.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&fit=crop',
-    },
-  ]);
+  useEffect(() => {
+    if (!user) return;
+    const fetchMessages = async () => {
+      setLoading(true);
+      // Fetch profile to check welcome_message_sent
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('created_at, welcome_message_sent')
+        .eq('id', user.id)
+        .single();
+      const welcomeSent = !!profile?.welcome_message_sent;
+      if (!welcomeSent) {
+        // Call the RPC function to insert the welcome message and set the flag atomically
+        await supabase.rpc('insert_welcome_message_once', {
+          uid: user.id,
+          created_at: profile?.created_at || new Date().toISOString(),
+        });
+      }
+      // Always fetch and display all system messages for the user
+      const { data: systemMessages, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('receiver_id', user.id)
+        .eq('type', 'system')
+        .order('created_at', { ascending: true });
+      if (!error && systemMessages) {
+        setMessages(systemMessages);
+      }
+      setLoading(false);
+      if (onUpdateUnread) onUpdateUnread();
+    };
+    fetchMessages();
+  }, [user]);
 
   const filteredMessages = activeCategory === 'all' 
     ? messages 
@@ -90,23 +72,30 @@ export default function InboxScreen() {
   const handleMessagePress = (message: Message) => {
     setSelectedMessage(message);
     setModalVisible(true);
-    
-    // Mark as read
+    // Mark as read in DB
     if (!message.isRead) {
       setMessages(prev => prev.map(msg => 
         msg.id === message.id ? { ...msg, isRead: true } : msg
       ));
+      supabase.from('messages').update({ is_read: true }).eq('id', message.id);
     }
   };
 
-  const handleDeleteMessage = (messageId: string) => {
+  const handleDeleteMessage = async (messageId: string) => {
     setMessages(prev => prev.filter(msg => msg.id !== messageId));
     setModalVisible(false);
     setSelectedMessage(null);
+    await supabase.from('messages').delete().eq('id', messageId);
+    if (onUpdateUnread) onUpdateUnread();
   };
 
   const markAllAsRead = () => {
     setMessages(prev => prev.map(msg => ({ ...msg, isRead: true })));
+    const ids = messages.filter(msg => !msg.isRead).map(msg => msg.id);
+    if (ids.length > 0) {
+      supabase.from('messages').update({ is_read: true }).in('id', ids);
+    }
+    if (onUpdateUnread) onUpdateUnread();
   };
 
   const getMessageIcon = (type: MessageType) => {

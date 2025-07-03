@@ -1044,6 +1044,9 @@ export default function SocialScreen() {
         {activeTab === 'leaderboard' && renderLeaderboardTab()}
 
         {renderModal()}
+        <View style={styles.overlay}>
+          <Text style={styles.comingSoon}>Coming Soon</Text>
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -1052,6 +1055,7 @@ export default function SocialScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0a0a1a',
   },
   safeArea: {
     flex: 1,
@@ -1828,5 +1832,19 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10,10,26,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  comingSoon: {
+    fontSize: 28,
+    color: '#00ffff',
+    fontFamily: 'Orbitron-Bold',
+    textAlign: 'center',
+    margin: 20,
   },
 });
