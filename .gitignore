@@ -35,3 +35,6 @@ yarn-error.*
 *.tsbuildinfo
 
 reference_folder_del_later/
+
+# supabase
+supabase/

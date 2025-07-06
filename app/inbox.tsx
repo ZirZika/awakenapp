@@ -54,9 +54,180 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
         .eq('receiver_id', user.id)
         .eq('type', 'system')
         .order('created_at', { ascending: true });
+      
+      // Create hardcoded messages array
+      let allMessages: Message[] = [];
+      
+      // Add hardcoded updates message (Friday's date)
+      const updatesMessage: Message = {
+        id: 'updates-001',
+        type: 'system',
+        title: '🎉 App Updates Available! (2025/07/04)',
+        content: `Hey Awakened! We've got some exciting new features for you:
+
+🔥 **New Features:**
+• Enhanced Daily Quest System
+• Improved XP Tracking
+• Better Error Handling
+• Navigation Improvements
+
+⚡ **Performance Updates:**
+• Faster loading times
+• Smoother animations
+• Better stability
+
+🎯 **What's Next:**
+• Guild system coming soon
+• Friend challenges
+• Advanced analytics
+
+Keep up the great work on your journey to becoming a Monarch and the main character of your story! 💪
+
+- The Awaken Team`,
+        timestamp: new Date('2025-07-04').toISOString(),
+        isRead: false,
+        sender: 'System',
+      };
+      
+      // Add new hardcoded updates message for today
+      const newUpdatesMessage: Message = {
+        id: 'updates-002',
+        type: 'system',
+        title: '🚀 Major Quest System Overhaul! (2025/07/06)',
+        content: `Greetings, Awakened! 
+
+We've just completed a massive overhaul of the quest and XP system:
+
+🎯 **Quest System Improvements:**
+• Fixed XP calculation and display
+• Added real-time UI updates
+• Implemented completed quests tracking
+• Enhanced system quest completion
+
+⚡ **XP & Leveling Fixes:**
+• Proper XP progress display (e.g., 650/1000)
+• Real-time stats updates across all screens
+• Fixed quest completion rewards
+• Enhanced level calculation
+
+🔧 **Technical Improvements:**
+• Added comprehensive logging system
+• Fixed quest persistence across sessions
+• Improved error handling
+• Better database integration
+
+🎮 **User Experience:**
+• No more page reloads needed for updates
+• Immediate quest completion feedback
+• Better quest tracking and history
+• Enhanced debugging capabilities
+
+The quest system is now fully functional and ready for your epic journey! Complete quests, earn XP, and level up like never before! 💪
+
+- The Awaken Team`,
+        timestamp: new Date('2025-07-06').toISOString(),
+        isRead: false,
+        sender: 'System',
+      };
+      
+      // Add class update message for existing users
+      const classUpdateMessage: Message = {
+        id: 'class-update-001',
+        type: 'system',
+        title: '⚔️ Class System Update - Choose Your New Path! (2025/07/06)',
+        content: `Greetings, Awakened! 
+
+We've updated the class system with more epic and fitting classes for your journey:
+
+⚔️ **New Classes Available:**
+
+🔥 **Berserker (Red)** - Unstoppable fury and raw power
+• Perfect for those who charge headfirst into challenges
+• Red aura represents passion and determination
+
+🕷️ **Shinobi (Purple)** - Shadow mastery and stealth
+• Ideal for strategic thinkers and silent achievers
+• Purple aura represents mystery and intelligence
+
+🌿 **Sage (Green)** - Ancient wisdom and knowledge
+• Perfect for those who seek growth and learning
+• Green aura represents balance and growth
+
+👑 **Vagabond (Blue)** - Adaptable wanderer and survivor
+• Ideal for those who adapt to any situation
+• Blue aura represents calm and focus
+
+**Action Required:** Please visit your profile settings to choose your new class. Your current class will be automatically converted to the closest match, but you can change it anytime!
+
+Choose wisely, for your class will influence your journey and the quests you receive! 🎯
+
+- The Awaken Team`,
+        timestamp: new Date('2025-07-06').toISOString(),
+        isRead: false,
+        sender: 'System',
+      };
+      
+      // Add hardcoded daily motivation message
+      const motivationMessage: Message = {
+        id: 'motivation-001',
+        type: 'system',
+        title: '💪 Daily Motivation',
+        content: `Good morning, Awakened! 
+
+Today is a new opportunity to level up your life. Remember:
+
+🌟 Every small step counts towards your goals
+🎯 Focus on progress, not perfection
+🔥 Your consistency is your superpower
+⚡ You're stronger than you think
+
+Today's challenge: Complete at least one daily task and write a journal entry. You've got this! 
+
+Stay legendary,
+- The Awaken Team`,
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+        isRead: true,
+        sender: 'System',
+      };
+      
+      // Add hardcoded achievement unlocked message
+      const achievementMessage: Message = {
+        id: 'achievement-001',
+        type: 'system',
+        title: '🏆 Achievement Unlocked!',
+        content: `Congratulations, Awakened! 
+
+You've just unlocked a new achievement:
+
+🎯 **"First Steps"**
+Complete your first daily task
+
+This achievement shows your commitment to personal growth. Keep pushing forward and unlock more achievements on your journey!
+
+Rewards:
+• +50 XP Bonus
+• New title unlocked: "Dedicated Apprentice"
+
+Your progress is being tracked, and we're excited to see what you'll accomplish next!
+
+- The Awaken Team`,
+        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+        isRead: false,
+        sender: 'System',
+      };
+      
+      allMessages.push(classUpdateMessage); // Add class update message first (most recent)
+      allMessages.push(newUpdatesMessage);
+      allMessages.push(updatesMessage);
+      allMessages.push(motivationMessage);
+      allMessages.push(achievementMessage);
+      
+      // Add database messages if they exist
       if (!error && systemMessages) {
-        setMessages(systemMessages);
+        allMessages = [...allMessages, ...systemMessages];
       }
+      
+      setMessages(allMessages);
       setLoading(false);
       if (onUpdateUnread) onUpdateUnread();
     };
@@ -114,10 +285,26 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
     }
   };
 
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) {
+      return 'Just now';
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays}d ago`;
+    }
+  };
+
   const renderCategoryButton = (category: MessageCategory, icon: React.ReactNode, title: string, count?: number) => (
     <TouchableOpacity
       style={[styles.categoryButton, activeCategory === category && styles.activeCategoryButton]}
       onPress={() => setActiveCategory(category)}
+      testID={`inbox-category-${category}`}
     >
       {icon}
       <Text style={[styles.categoryButtonText, activeCategory === category && styles.activeCategoryButtonText]}>
@@ -150,6 +337,7 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
               <TouchableOpacity 
                 style={styles.markAllButton}
                 onPress={markAllAsRead}
+                testID="inbox-mark-all-read-button"
               >
                 <Check size={16} color="#10b981" />
                 <Text style={styles.markAllText}>Mark All Read</Text>
@@ -158,6 +346,7 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
             <TouchableOpacity 
               style={styles.closeButton}
               onPress={() => router.back()}
+              testID="inbox-close-button"
             >
               <X size={24} color="#ef4444" />
             </TouchableOpacity>
@@ -198,6 +387,7 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
                 key={message.id}
                 style={[styles.messageCard, !message.isRead && styles.unreadMessage]}
                 onPress={() => handleMessagePress(message)}
+                testID={`inbox-message-${message.id}`}
               >
                 <View style={styles.messageHeader}>
                   <View style={styles.messageTypeContainer}>
@@ -213,7 +403,7 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
                     )}
                   </View>
                   <View style={styles.messageTime}>
-                    <Text style={styles.messageTimestamp}>{message.timestamp}</Text>
+                    <Text style={styles.messageTimestamp}>{formatTimestamp(message.timestamp)}</Text>
                     {!message.isRead && <View style={styles.unreadDot} />}
                   </View>
                 </View>
@@ -247,6 +437,7 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
                   <TouchableOpacity 
                     style={styles.modalCloseButton}
                     onPress={() => setModalVisible(false)}
+                    testID="inbox-modal-close-button"
                   >
                     <X size={20} color="#6b7280" />
                   </TouchableOpacity>
@@ -256,7 +447,7 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
                   <Text style={styles.modalSender}>From: {selectedMessage.sender}</Text>
                 )}
                 
-                <Text style={styles.modalTimestamp}>{selectedMessage.timestamp}</Text>
+                <Text style={styles.modalTimestamp}>{formatTimestamp(selectedMessage.timestamp)}</Text>
                 
                 <ScrollView style={styles.modalContentScroll}>
                   <Text style={styles.modalContentText}>{selectedMessage.content}</Text>
@@ -268,12 +459,14 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
                     onPress={() => handleDeleteMessage(selectedMessage.id)}
                     variant="secondary"
                     style={styles.modalButton}
+                    testID="inbox-modal-delete-button"
                   />
                   <GlowingButton
                     title="Close"
                     onPress={() => setModalVisible(false)}
                     variant="primary"
                     style={styles.modalButton}
+                    testID="inbox-modal-close-button-primary"
                   />
                 </View>
               </View>

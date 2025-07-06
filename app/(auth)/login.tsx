@@ -152,6 +152,7 @@ export default function LoginScreen() {
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
+                      testID="login-email-input"
                     />
                   </View>
                 </View>
@@ -171,10 +172,12 @@ export default function LoginScreen() {
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
+                      testID="login-password-input"
                     />
                     <TouchableOpacity
                       style={styles.eyeButton}
                       onPress={() => setShowPassword(!showPassword)}
+                      testID="login-toggle-password-visibility"
                     >
                       {showPassword ? (
                         <EyeOff size={20} color="#9ca3af" />
@@ -191,9 +194,13 @@ export default function LoginScreen() {
                   variant="primary"
                   style={styles.loginButton}
                   disabled={loading}
+                  testID="login-submit-button"
                 />
 
-                <TouchableOpacity style={styles.forgotPassword}>
+                <TouchableOpacity 
+                  style={styles.forgotPassword}
+                  testID="login-forgot-password-button"
+                >
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
               </View>
@@ -201,7 +208,10 @@ export default function LoginScreen() {
               {/* Sign Up Link */}
               <View style={styles.footer}>
                 <Text style={styles.footerText}>Don't have an account?</Text>
-                <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+                <TouchableOpacity 
+                  onPress={() => router.push('/(auth)/signup')}
+                  testID="login-signup-link"
+                >
                   <Text style={styles.signUpLink}>Sign Up</Text>
                 </TouchableOpacity>
               </View>
@@ -222,6 +232,7 @@ export default function LoginScreen() {
               <TouchableOpacity 
                 style={styles.testConnectionButton}
                 onPress={() => router.push('/test-connection')}
+                testID="login-test-connection-button"
               >
                 <Text style={styles.testConnectionText}>Test Database Connection</Text>
               </TouchableOpacity>

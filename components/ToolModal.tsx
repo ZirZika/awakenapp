@@ -31,6 +31,7 @@ export default function ToolModal({ visible, onClose, title, icon, children }: T
               style={styles.closeButton}
               onPress={onClose}
               activeOpacity={0.7}
+              testID="tool-modal-close-button"
             >
               <X size={24} color="#9ca3af" />
             </TouchableOpacity>

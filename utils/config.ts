@@ -34,8 +34,8 @@ export const scaleFont = (size: number) => {
 
 export const config = {
   openRouter: {
-    apiKey: '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',
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'deepseek/deepseek-r1-0528:free'
+    apiKey: process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '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',
+    apiUrl: process.env.EXPO_PUBLIC_OPENROUTER_API_URL || 'https://openrouter.ai/api/v1/chat/completions',
+    model: process.env.EXPO_PUBLIC_OPENROUTER_MODEL || 'anthropic/claude-3.5-sonnet:free'
   }
 }; 

@@ -41,6 +41,11 @@ export class AIService {
 
   private async callOpenRouterAPI(prompt: string): Promise<string> {
     try {
+      console.log('🌐 Calling OpenRouter API...');
+      console.log('🔑 API Key (first 10 chars):', this.apiKey.substring(0, 10) + '...');
+      console.log('🤖 Model:', this.model);
+      console.log('📝 Prompt length:', prompt.length);
+      
       const response = await axios.post(
         this.apiUrl,
         {
@@ -75,9 +80,19 @@ export class AIService {
         }
       );
 
+      console.log('✅ OpenRouter API response received');
+      console.log('📄 Response status:', response.status);
+      console.log('📄 Response data keys:', Object.keys(response.data));
+      
       return response.data.choices[0].message.content;
-    } catch (error) {
-      console.error('Error calling OpenRouter API:', error);
+    } catch (error: any) {
+      console.error('❌ Error calling OpenRouter API:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
       throw new Error('Failed to generate quests with AI');
     }
   }
@@ -141,14 +156,16 @@ export class AIService {
     const recentEntries = context.journalEntries.slice(-3);
     const activeGoals = context.goals.filter(g => !g.isCompleted);
     const topValues = context.coreValues.sort((a, b) => b.importance - a.importance).slice(0, 3);
+    const completedTasks = context.completedTasks.slice(-5); // Recent completions
 
     return `Generate 3-5 personalized quests for a user based on their data:
 
 User Context:
 - Level: ${context.userLevel}
 - Recent Mood: ${recentEntries.map(e => e.mood).join(', ')}
-- Active Goals: ${activeGoals.map(g => g.title).join(', ')}
-- Top Core Values: ${topValues.map(v => v.title).join(', ')}
+- Active Goals: ${activeGoals.map(g => `${g.title} (${g.progress}% progress)`).join(', ')}
+- Top Core Values: ${topValues.map(v => `${v.title} (importance: ${v.importance}/10)`).join(', ')}
+- Recently Completed: ${completedTasks.map(t => t.title).join(', ')}
 
 Recent Journal Entries:
 ${recentEntries.map(entry => `
@@ -161,23 +178,39 @@ Challenges: ${entry.challenges.join(', ')}
 Tomorrow's Goals: ${entry.tomorrowGoals.join(', ')}
 `).join('\n')}
 
+Goal Progress Analysis:
+${activeGoals.map(goal => `
+Goal: ${goal.title}
+Progress: ${goal.progress}%
+Description: ${goal.description}
+Target Date: ${goal.targetDate || 'No deadline'}
+`).join('\n')}
+
 Please generate quests that:
-1. Address the user's current challenges
-2. Build on their recent achievements
-3. Align with their core values
-4. Help progress toward their goals
-5. Match their current mood and energy level
+1. **Help achieve specific goals** - Create quests that directly advance goal progress
+2. **Address current challenges** - Based on journal entries, create quests that help overcome obstacles
+3. **Build on recent achievements** - Leverage momentum from completed tasks
+4. **Align with core values** - Ensure quests reflect the user's most important values
+5. **Match energy level** - Consider mood and recent activity level
+6. **Provide clear next steps** - Each quest should have actionable, specific instructions
+
+Quest Guidelines:
+- For goals with low progress (<30%): Create foundational quests that build momentum
+- For goals with medium progress (30-70%): Create breakthrough quests that push toward completion
+- For goals with high progress (>70%): Create finishing quests that help cross the finish line
+- For challenging moods: Create supportive, self-care focused quests
+- For positive moods: Create ambitious, growth-focused quests
 
 Respond with **only valid JSON** in this format:
 {
   "quests": [
     {
       "title": "Quest Title",
-      "description": "Detailed quest description",
+      "description": "Detailed quest description with specific steps",
       "difficulty": "Easy|Medium|Hard|Epic",
       "xpReward": 50,
       "category": "Personal|Health|Career|Relationships|Learning",
-      "reasoning": "Why this quest was generated",
+      "reasoning": "Why this quest was generated and how it helps achieve goals",
       "estimatedDuration": "15 minutes|1 hour|1 day|1 week"
     }
   ]

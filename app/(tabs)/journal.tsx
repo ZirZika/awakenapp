@@ -5,31 +5,39 @@ import { BookOpen, Settings, Target, Award, Heart, Calendar, Smile, Meh, Frown, 
 import { router } from 'expo-router';
 import { Goal, JournalEntry, CoreValue, PersonalAchievement, Task, SystemQuest } from '@/types/app';
 import { 
-  getGoals, 
-  addGoalWithIntelligentTasks, 
-  addTask, 
-  getJournalEntries, 
-  addJournalEntry, 
-  getCoreValues, 
-  addCoreValue,
-  getPersonalAchievements,
-  addPersonalAchievement,
-  generateIntelligentTasksFromContext,
-  getTasks,
-  completeTask,
-  getSystemQuests,
-  initializeSystemQuests,
-  generateAIQuestsFromContext,
-  getSuggestedGoals
-} from '@/utils/storage';
+  getUserGoals,
+  createGoal,
+  updateGoal,
+  getUserJournalEntries,
+  createJournalEntry,
+  getUserCoreValues,
+  createCoreValue,
+  getUserPersonalAchievements,
+  createPersonalAchievement,
+  getUserTasks,
+  createTask,
+  updateTask,
+  getUserSystemQuests,
+  createSystemQuest,
+  updateSystemQuest,
+  createCompletedQuest,
+  getUserAIGeneratedQuests,
+  createAIGeneratedQuest,
+  updateAIGeneratedQuest,
+  updateUserStats
+} from '@/utils/supabaseStorage';
 import { generateTasksForGoal } from '@/utils/gameLogic';
 import GlowingButton from '@/components/GlowingButton';
 import TaskCard from '@/components/TaskCard';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import AIService from '@/utils/aiService';
 
 type TabType = 'quests' | 'journal' | 'achievements' | 'goals' | 'values';
 type ModalType = 'journal' | 'goal' | 'achievement' | 'value' | null;
 
 export default function WarJournalScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('quests');
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
@@ -42,9 +50,7 @@ export default function WarJournalScreen() {
   const [personalAchievements, setPersonalAchievements] = useState<PersonalAchievement[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [systemQuests, setSystemQuests] = useState<SystemQuest[]>([]);
-
-  // Mock unread message count
-  const [unreadMessages] = useState(3);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   // Form states
   const [newGoal, setNewGoal] = useState({
@@ -79,37 +85,177 @@ export default function WarJournalScreen() {
   });
 
   useEffect(() => {
+    if (user) {
     loadData();
-    // Initialize system quests if not already done
-    if (systemQuests.length === 0) {
-      initializeSystemQuests();
-      setSystemQuests(getSystemQuests());
     }
-  }, []);
+  }, [user]);
 
-  const loadData = () => {
-    // Clean up expired AI quests from storage
-    const allTasks = getTasks();
-    const now = new Date();
-    const validTasks = allTasks.filter(task => {
-      if (task.questType === 'ai-generated') {
-        const createdAt = new Date(task.createdAt);
-        const hoursDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-        return hoursDiff < 24 || task.isCompleted; // Keep if <24h old or completed
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnreadCount = async () => {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('type', 'system')
+        .eq('is_read', false);
+      if (!error && typeof count === 'number') {
+        setUnreadMessages(count);
       }
-      return true;
-    });
-    // Overwrite storage with only valid tasks
-    if (validTasks.length !== allTasks.length) {
-      // Replace tasks in storage (in-memory for now)
-      require('@/utils/storage').tasks = validTasks;
+    };
+    fetchUnreadCount();
+  }, [user]);
+
+  const generateStoryQuestsForExistingGoals = async (userGoals: Goal[], userTasks: Task[]) => {
+    if (!user) return;
+    
+    try {
+      console.log('🎯 Checking for existing goals that need story quests...');
+      
+      for (const goal of userGoals) {
+        // Check if this goal already has story quests
+        const existingStoryQuests = userTasks.filter(task => 
+          task.questType === 'goal-based' && task.goalId === goal.id
+        );
+        
+        if (existingStoryQuests.length === 0) {
+          console.log('📝 Generating story quests for existing goal:', goal.title);
+          const storyQuests = generateTasksForGoal(goal.title, goal.description);
+          
+          // Save story quests to database
+          for (const quest of storyQuests) {
+            console.log('💾 Saving story quest for existing goal:', quest.title);
+            await createTask(user.id, {
+              ...quest,
+              goalId: goal.id,
+              isCompleted: false
+            });
+          }
+          console.log('✅ Generated', storyQuests.length, 'story quests for existing goal:', goal.title);
+        } else {
+          console.log('✅ Goal already has story quests:', goal.title, '(', existingStoryQuests.length, 'quests)');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error generating story quests for existing goals:', error);
     }
-    setGoals(getGoals());
-    setJournalEntries(getJournalEntries());
-    setCoreValues(getCoreValues());
-    setPersonalAchievements(getPersonalAchievements());
-    setTasks(getTasks());
-    setSystemQuests(getSystemQuests());
+  };
+
+  const checkDailyJournalCompletion = async (userJournalEntries: JournalEntry[], userSystemQuests: SystemQuest[]) => {
+    if (!user) return;
+    
+    try {
+      console.log('📝 Checking daily journal completion...');
+      
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      console.log('📅 Today\'s date:', today);
+      
+      // Check if there's a journal entry for today
+      const todaysEntry = userJournalEntries.find(entry => entry.date === today);
+      
+      if (todaysEntry) {
+        console.log('✅ Found journal entry for today:', todaysEntry.title);
+        
+        // Check if the daily journal quest is not completed
+        const dailyJournalQuest = userSystemQuests.find(q => 
+          q.title === 'Daily Journal Entry' && !q.isCompleted
+        );
+        
+        if (dailyJournalQuest) {
+          console.log('🎯 Daily Journal Quest found and not completed, auto-completing...');
+          
+          await updateSystemQuest(dailyJournalQuest.id, {
+            isCompleted: true,
+            lastCompleted: new Date().toISOString(),
+            nextDue: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow
+          });
+          
+          console.log('✅ System quest updated, now creating completed quest record...');
+          
+          // Create completed quest record
+          await createCompletedQuest(user.id, {
+            title: dailyJournalQuest.title,
+            description: dailyJournalQuest.description,
+            xpReward: dailyJournalQuest.xpReward,
+            difficulty: dailyJournalQuest.difficulty,
+            category: dailyJournalQuest.category,
+            questType: 'system',
+            completedAt: new Date().toISOString(),
+          });
+          
+          console.log('✅ Completed quest record created, now updating user stats...');
+          
+          // Update user stats with XP reward
+          const statsUpdate = {
+            currentXP: dailyJournalQuest.xpReward,
+            tasksCompleted: 1
+          };
+          console.log('📊 Updating user stats with:', statsUpdate);
+          
+          await updateUserStats(user.id, statsUpdate);
+          
+          console.log('✅ User stats updated successfully');
+          
+          Alert.alert('Quest Auto-Completed! 🎯', `You already completed today's journal entry! +${dailyJournalQuest.xpReward} XP awarded!`);
+          
+          // Force refresh of user stats in parent components
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('userStatsUpdated'));
+          }
+        } else {
+          console.log('✅ Daily Journal Quest already completed or not found');
+        }
+      } else {
+        console.log('📝 No journal entry found for today');
+      }
+    } catch (error) {
+      console.error('❌ Error checking daily journal completion:', error);
+    }
+  };
+
+  const loadData = async () => {
+    if (!user) return;
+    try {
+      console.log('🔄 Loading journal data for user:', user.id);
+      
+      // Load all data from database
+      const [userGoals, userJournalEntries, userCoreValues, userPersonalAchievements, userTasks, userSystemQuests] = await Promise.all([
+        getUserGoals(user.id),
+        getUserJournalEntries(user.id),
+        getUserCoreValues(user.id),
+        getUserPersonalAchievements(user.id),
+        getUserTasks(user.id),
+        getUserSystemQuests(user.id)
+      ]);
+      
+      console.log('📊 Loaded data:', {
+        goals: userGoals.length,
+        journalEntries: userJournalEntries.length,
+        coreValues: userCoreValues.length,
+        achievements: userPersonalAchievements.length,
+        tasks: userTasks.length,
+        systemQuests: userSystemQuests.length
+      });
+      
+      console.log('🎯 System Quests:', userSystemQuests.map(q => ({ title: q.title, isCompleted: q.isCompleted })));
+      console.log('📋 Tasks:', userTasks.map(t => ({ title: t.title, isCompleted: t.isCompleted, questType: t.questType })));
+      
+      // Generate story quests for existing goals that don't have them
+      await generateStoryQuestsForExistingGoals(userGoals, userTasks);
+      
+      // Check if daily journal entry is already completed for today
+      await checkDailyJournalCompletion(userJournalEntries, userSystemQuests);
+      
+      setGoals(userGoals);
+      setJournalEntries(userJournalEntries);
+      setCoreValues(userCoreValues);
+      setPersonalAchievements(userPersonalAchievements);
+      setTasks(userTasks);
+      setSystemQuests(userSystemQuests);
+    } catch (error) {
+      console.error('❌ Error loading data:', error);
+    }
   };
 
   const openModal = (type: ModalType) => {
@@ -127,72 +273,248 @@ export default function WarJournalScreen() {
     setNewAchievement({ title: '', description: '', category: '', date: new Date().toISOString().split('T')[0], significance: 'minor' });
   };
 
-  const handleCompleteTask = (taskId: string) => {
-    completeTask(taskId);
-    loadData();
+  const handleCompleteTask = async (taskId: string) => {
+    if (!user) return;
+    try {
+      console.log('🎯 Completing task:', taskId);
+      
+      // Find the task to get its details
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) {
+        console.error('❌ Task not found:', taskId);
+        return;
+      }
+      
+      console.log('📋 Task details:', {
+        title: task.title,
+        xpReward: task.xpReward,
+        questType: task.questType,
+        goalId: task.goalId,
+        progressValue: task.progressValue
+      });
+      
+      // Mark task as completed
+      await updateTask(taskId, { isCompleted: true, completedAt: new Date().toISOString() });
+      
+      // Create completed quest record
+      console.log('📝 Creating completed quest record...');
+      await createCompletedQuest(user.id, {
+        title: task.title,
+        description: task.description,
+        xpReward: task.xpReward,
+        difficulty: task.difficulty,
+        category: task.category,
+        questType: task.questType === 'goal-based' ? 'story' : task.questType === 'ai-generated' ? 'ai' : 'daily',
+        completedAt: new Date().toISOString(),
+      });
+      
+      // Award XP and update user stats
+      console.log('💰 Awarding XP:', task.xpReward);
+      const statsUpdate = {
+        currentXP: task.xpReward,
+        tasksCompleted: 1
+      };
+      console.log('📊 Updating user stats with:', statsUpdate);
+      
+      await updateUserStats(user.id, statsUpdate);
+      
+      // Update goal progress if this is a story quest
+      if (task.questType === 'goal-based' && task.goalId && task.progressValue) {
+        console.log('🎯 Updating goal progress for goal:', task.goalId);
+        console.log('📈 Progress value:', task.progressValue);
+        
+        const goal = goals.find(g => g.id === task.goalId);
+        if (goal) {
+          const newProgress = Math.min(goal.progress + task.progressValue, 100);
+          console.log('📊 Goal progress update:', goal.progress, '->', newProgress);
+          
+          await updateGoal(task.goalId, { progress: newProgress });
+          
+          // Check if goal is now completed
+          if (newProgress >= 100 && !goal.isCompleted) {
+            console.log('🎉 Goal completed!');
+            await updateGoal(task.goalId, { isCompleted: true });
+            
+            // Award bonus XP for goal completion
+            const goalCompletionXP = 500;
+            console.log('🏆 Awarding goal completion bonus XP:', goalCompletionXP);
+            await updateUserStats(user.id, { currentXP: goalCompletionXP });
+            
+            Alert.alert('Goal Completed! 🎉', `Congratulations! You've completed "${goal.title}"! +${goalCompletionXP} bonus XP!`);
+            
+            // Force refresh of user stats in parent components
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('userStatsUpdated'));
+            }
+          }
+        }
+      }
+      
+      console.log('✅ Task completed successfully');
+      Alert.alert('Quest Complete! 🎯', `You earned +${task.xpReward} XP!`);
+      
+      // Refresh data to update UI
+      await loadData();
+      
+      // Force refresh of user stats in parent components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('userStatsUpdated'));
+      }
+    } catch (error) {
+      console.error('❌ Error completing task:', error);
+      Alert.alert('Error', 'Failed to complete task. Please try again.');
+    }
   };
 
   const handleGenerateAIQuests = async () => {
+    if (!user) return;
     setIsGeneratingQuests(true);
     try {
-      await generateAIQuestsFromContext();
-      loadData();
-      Alert.alert('AI Quests Generated! 🤖', 'New personalized quests have been created based on your journal entries and goals.');
+      console.log('🤖 Starting AI quest generation...');
+      const aiService = AIService;
+      
+      // Get context for AI generation
+      const context = {
+        journalEntries,
+        goals,
+        coreValues,
+        completedTasks: tasks.filter(t => t.isCompleted),
+        userLevel: 1 // You can get this from userStats
+      };
+      
+      console.log('📊 AI Context:', {
+        journalEntries: context.journalEntries.length,
+        goals: context.goals.length,
+        coreValues: context.coreValues.length,
+        completedTasks: context.completedTasks.length,
+        userLevel: context.userLevel
+      });
+      
+      console.log('🎯 Active Goals:', context.goals.map(g => ({ title: g.title, progress: g.progress, isCompleted: g.isCompleted })));
+      console.log('💎 Core Values:', context.coreValues.map(v => ({ title: v.title, importance: v.importance })));
+      
+      // Generate AI quests
+      console.log('🔄 Calling AI service...');
+      const generatedQuests = await aiService.generatePersonalizedQuests(context);
+      
+      console.log('✅ AI Quests Generated:', generatedQuests.length);
+      console.log('📋 Generated Quests:', generatedQuests);
+      
+      // Save AI quests to database as tasks
+      for (const quest of generatedQuests) {
+        console.log('💾 Saving quest:', quest.title);
+        await createTask(user.id, {
+          title: quest.title,
+          description: quest.description,
+          xpReward: quest.xpReward,
+          difficulty: quest.difficulty,
+          isCompleted: false,
+          questType: 'ai-generated',
+          category: quest.category,
+          reasoning: quest.reasoning,
+          estimatedDuration: quest.estimatedDuration,
+          isUnlocked: true
+        });
+      }
+      
+      console.log('✅ All quests saved to database');
+      
+      // Reload data to show new quests
+      await loadData();
+      
+      Alert.alert('AI Quests Generated! 🤖', `Created ${generatedQuests.length} personalized quests based on your journal entries and goals.`);
     } catch (error) {
+      console.error('❌ Error generating AI quests:', error);
       Alert.alert('Error', 'Failed to generate AI quests. Please try again.');
     } finally {
       setIsGeneratingQuests(false);
     }
   };
 
-  const handleCreateGoal = () => {
-    if (!newGoal.title.trim()) {
+  const handleCreateGoal = async () => {
+    if (!user || !newGoal.title.trim()) {
       Alert.alert('Error', 'Please enter a goal title');
       return;
     }
 
-    const goal: Goal = {
-      id: Date.now().toString(),
+    const goal: Omit<Goal, 'id' | 'createdAt'> = {
       title: newGoal.title,
       description: newGoal.description,
       category: newGoal.category || 'Personal',
       targetDate: newGoal.targetDate,
       isCompleted: false,
       progress: 0,
-      createdAt: new Date().toISOString(),
     };
 
-    // Use intelligent task generation
-    addGoalWithIntelligentTasks(goal);
+        try {
+      // Create goal in database
+      const createdGoal = await createGoal(user.id, goal);
 
-    // Auto-complete the 'monthly-goal' system quest and award XP
-    const systemQuests = require('@/utils/storage').getSystemQuests();
-    const userStats = require('@/utils/storage').getUserStats();
-    const monthlyGoalQuest = systemQuests.find((q: import('@/types/app').SystemQuest) => q.id === 'monthly-goal' && !q.isCompleted);
-    if (monthlyGoalQuest) {
-      monthlyGoalQuest.isCompleted = true;
-      userStats.currentXP += monthlyGoalQuest.xpReward;
-      userStats.totalXP += monthlyGoalQuest.xpReward;
-      userStats.tasksCompleted += 1;
-      // Level up logic
-      const newLevel = Math.floor(userStats.totalXP / 1000) + 1;
-      if (newLevel > userStats.level) {
-        userStats.level = newLevel;
-        userStats.title = 'Level ' + newLevel;
+      // Generate story quests for this goal
+      console.log('🎯 Generating story quests for goal:', goal.title);
+      const storyQuests = generateTasksForGoal(goal.title, goal.description);
+      
+      // Save story quests to database
+      for (const quest of storyQuests) {
+        console.log('💾 Saving story quest:', quest.title);
+        await createTask(user.id, {
+          ...quest,
+          goalId: createdGoal.id, // Link to the created goal
+          isCompleted: false
+        });
       }
-      userStats.xpToNextLevel = (userStats.level * 1000) - (userStats.totalXP % 1000);
-      Alert.alert('Quest Complete!', `You earned +${monthlyGoalQuest.xpReward} XP for setting a monthly goal!`);
+      console.log('✅ Generated', storyQuests.length, 'story quests for goal');
+
+      // Check if this completes the "Weekly Goal Setting" system quest
+      const weeklyGoalQuest = systemQuests.find(q => 
+        q.title === 'Weekly Goal Setting' && !q.isCompleted
+      );
+      
+      if (weeklyGoalQuest) {
+        console.log('🎯 Weekly Goal Quest found:', weeklyGoalQuest);
+        
+        await updateSystemQuest(weeklyGoalQuest.id, {
+          isCompleted: true,
+          lastCompleted: new Date().toISOString(),
+          nextDue: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Next week
+        });
+        
+        console.log('✅ System quest updated, now updating user stats...');
+        
+        // Update user stats with XP reward
+        const statsUpdate = {
+          currentXP: weeklyGoalQuest.xpReward,
+          tasksCompleted: 1
+        };
+        console.log('📊 Updating user stats with:', statsUpdate);
+        
+        await updateUserStats(user.id, statsUpdate);
+        
+        console.log('✅ User stats updated successfully');
+        
+        Alert.alert('Quest Complete! 🎯', `You earned +${weeklyGoalQuest.xpReward} XP for setting a weekly goal!`);
+      } else {
+        console.log('❌ Weekly Goal Quest not found or already completed');
     }
 
     closeModal();
-    loadData();
+      await loadData();
+      
+      // Force refresh of user stats in parent components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('userStatsUpdated'));
+      }
     
     // Show success message
     Alert.alert(
       'Goal Created! 🎯', 
-      'Your goal has been added and intelligent tasks have been generated based on your journal entries and progress patterns.',
+        'Your goal has been added successfully.',
       [{ text: 'View Tasks', onPress: () => setActiveTab('quests') }]
     );
+    } catch (error) {
+      console.error('Error creating goal:', error);
+      Alert.alert('Error', 'Failed to create goal. Please try again.');
+    }
   };
 
   const handleCreateJournalEntry = async () => {
@@ -214,33 +536,66 @@ export default function WarJournalScreen() {
       createdAt: new Date().toISOString(),
     };
 
-    await addJournalEntry(entry);
-
-    // Auto-complete the 'daily-journal' system quest and award XP
-    const systemQuests = require('@/utils/storage').getSystemQuests();
-    const userStats = require('@/utils/storage').getUserStats();
-    const dailyQuest = systemQuests.find((q: import('@/types/app').SystemQuest) => q.id === 'daily-journal' && !q.isCompleted);
-    if (dailyQuest) {
-      dailyQuest.isCompleted = true;
-      userStats.currentXP += dailyQuest.xpReward;
-      userStats.totalXP += dailyQuest.xpReward;
-      userStats.tasksCompleted += 1;
-      // Level up logic
-      const newLevel = Math.floor(userStats.totalXP / 1000) + 1;
-      if (newLevel > userStats.level) {
-        userStats.level = newLevel;
-        userStats.title = 'Level ' + newLevel;
+    if (user) {
+      await createJournalEntry(user.id, entry);
+      
+      // Check if this completes the "Daily Journal Entry" system quest
+      const dailyJournalQuest = systemQuests.find(q => 
+        q.title === 'Daily Journal Entry' && !q.isCompleted
+      );
+      
+      if (dailyJournalQuest) {
+        console.log('📝 Daily Journal Quest found:', dailyJournalQuest);
+        
+        await updateSystemQuest(dailyJournalQuest.id, {
+          isCompleted: true,
+          lastCompleted: new Date().toISOString(),
+          nextDue: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow
+        });
+        
+        console.log('✅ System quest updated, now creating completed quest record...');
+        
+        // Create completed quest record
+        await createCompletedQuest(user.id, {
+          title: dailyJournalQuest.title,
+          description: dailyJournalQuest.description,
+          xpReward: dailyJournalQuest.xpReward,
+          difficulty: dailyJournalQuest.difficulty,
+          category: dailyJournalQuest.category,
+          questType: 'system',
+          completedAt: new Date().toISOString(),
+        });
+        
+        console.log('✅ Completed quest record created, now updating user stats...');
+        
+        // Update user stats with XP reward
+        const statsUpdate = {
+          currentXP: dailyJournalQuest.xpReward,
+          tasksCompleted: 1
+        };
+        console.log('📊 Updating user stats with:', statsUpdate);
+        
+        await updateUserStats(user.id, statsUpdate);
+        
+        console.log('✅ User stats updated successfully');
+        
+        Alert.alert('Quest Complete! 🎯', `You earned +${dailyJournalQuest.xpReward} XP for completing your daily journal entry!`);
+      } else {
+        console.log('❌ Daily Journal Quest not found or already completed');
       }
-      userStats.xpToNextLevel = (userStats.level * 1000) - (userStats.totalXP % 1000);
-      Alert.alert('Quest Complete!', `You earned +${dailyQuest.xpReward} XP for completing your daily journal!`);
     }
 
     closeModal();
-    loadData();
-    // Show success message about intelligent task generation
+    await loadData();
+    
+    // Force refresh of user stats in parent components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('userStatsUpdated'));
+    }
+    // Show success message
     Alert.alert(
       'Journal Entry Added! 📝', 
-      'Your entry has been recorded and new personalized AI quests have been generated based on your reflections.',
+      'Your entry has been recorded successfully.',
       [{ text: 'Check Quests', onPress: () => setActiveTab('quests') }]
     );
   };
@@ -259,29 +614,62 @@ export default function WarJournalScreen() {
       createdAt: new Date().toISOString(),
     };
 
-    await addCoreValue(value);
-
-    // Auto-complete the 'core-values' system quest and award XP
-    const systemQuests = require('@/utils/storage').getSystemQuests();
-    const userStats = require('@/utils/storage').getUserStats();
-    const coreValuesQuest = systemQuests.find((q: import('@/types/app').SystemQuest) => q.id === 'core-values' && !q.isCompleted);
+    if (user) {
+      await createCoreValue(user.id, value);
+      
+      // Check if this completes the "Core Values Reflection" system quest
+      const coreValuesQuest = systemQuests.find(q => 
+        q.title === 'Core Values Reflection' && !q.isCompleted
+      );
+      
     if (coreValuesQuest) {
-      coreValuesQuest.isCompleted = true;
-      userStats.currentXP += coreValuesQuest.xpReward;
-      userStats.totalXP += coreValuesQuest.xpReward;
-      userStats.tasksCompleted += 1;
-      // Level up logic
-      const newLevel = Math.floor(userStats.totalXP / 1000) + 1;
-      if (newLevel > userStats.level) {
-        userStats.level = newLevel;
-        userStats.title = 'Level ' + newLevel;
+        console.log('💎 Core Values Quest found:', coreValuesQuest);
+        
+        await updateSystemQuest(coreValuesQuest.id, {
+          isCompleted: true,
+          lastCompleted: new Date().toISOString(),
+          nextDue: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // Next month
+        });
+        
+        console.log('✅ System quest updated, now creating completed quest record...');
+        
+        // Create completed quest record
+        await createCompletedQuest(user.id, {
+          title: coreValuesQuest.title,
+          description: coreValuesQuest.description,
+          xpReward: coreValuesQuest.xpReward,
+          difficulty: coreValuesQuest.difficulty,
+          category: coreValuesQuest.category,
+          questType: 'system',
+          completedAt: new Date().toISOString(),
+        });
+        
+        console.log('✅ Completed quest record created, now updating user stats...');
+        
+        // Update user stats with XP reward
+        const statsUpdate = {
+          currentXP: coreValuesQuest.xpReward,
+          tasksCompleted: 1
+        };
+        console.log('📊 Updating user stats with:', statsUpdate);
+        
+        await updateUserStats(user.id, statsUpdate);
+        
+        console.log('✅ User stats updated successfully');
+        
+        Alert.alert('Quest Complete! 🎯', `You earned +${coreValuesQuest.xpReward} XP for updating your core values!`);
+      } else {
+        console.log('❌ Core Values Quest not found or already completed');
       }
-      userStats.xpToNextLevel = (userStats.level * 1000) - (userStats.totalXP % 1000);
-      Alert.alert('Quest Complete!', `You earned +${coreValuesQuest.xpReward} XP for updating your core values!`);
     }
 
     closeModal();
-    loadData();
+    await loadData();
+    
+    // Force refresh of user stats in parent components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('userStatsUpdated'));
+    }
   };
 
   const handleCreateAchievement = async () => {
@@ -300,29 +688,62 @@ export default function WarJournalScreen() {
       createdAt: new Date().toISOString(),
     };
 
-    await addPersonalAchievement(achievement);
-
-    // Auto-complete the 'weekly-win' system quest and award XP
-    const systemQuests = require('@/utils/storage').getSystemQuests();
-    const userStats = require('@/utils/storage').getUserStats();
-    const weeklyWinQuest = systemQuests.find((q: import('@/types/app').SystemQuest) => q.id === 'weekly-win' && !q.isCompleted);
-    if (weeklyWinQuest) {
-      weeklyWinQuest.isCompleted = true;
-      userStats.currentXP += weeklyWinQuest.xpReward;
-      userStats.totalXP += weeklyWinQuest.xpReward;
-      userStats.tasksCompleted += 1;
-      // Level up logic
-      const newLevel = Math.floor(userStats.totalXP / 1000) + 1;
-      if (newLevel > userStats.level) {
-        userStats.level = newLevel;
-        userStats.title = 'Level ' + newLevel;
+    if (user) {
+      await createPersonalAchievement(user.id, achievement);
+      
+      // Check if this completes the "Weekly Achievement" system quest
+      const weeklyAchievementQuest = systemQuests.find(q => 
+        q.title === 'Weekly Achievement' && !q.isCompleted
+      );
+      
+      if (weeklyAchievementQuest) {
+        console.log('🏆 Weekly Achievement Quest found:', weeklyAchievementQuest);
+        
+        await updateSystemQuest(weeklyAchievementQuest.id, {
+          isCompleted: true,
+          lastCompleted: new Date().toISOString(),
+          nextDue: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Next week
+        });
+        
+        console.log('✅ System quest updated, now creating completed quest record...');
+        
+        // Create completed quest record
+        await createCompletedQuest(user.id, {
+          title: weeklyAchievementQuest.title,
+          description: weeklyAchievementQuest.description,
+          xpReward: weeklyAchievementQuest.xpReward,
+          difficulty: weeklyAchievementQuest.difficulty,
+          category: weeklyAchievementQuest.category,
+          questType: 'system',
+          completedAt: new Date().toISOString(),
+        });
+        
+        console.log('✅ Completed quest record created, now updating user stats...');
+        
+        // Update user stats with XP reward
+        const statsUpdate = {
+          currentXP: weeklyAchievementQuest.xpReward,
+          tasksCompleted: 1
+        };
+        console.log('📊 Updating user stats with:', statsUpdate);
+        
+        await updateUserStats(user.id, statsUpdate);
+        
+        console.log('✅ User stats updated successfully');
+        
+        Alert.alert('Quest Complete! 🎯', `You earned +${weeklyAchievementQuest.xpReward} XP for recording a weekly achievement!`);
+      } else {
+        console.log('❌ Weekly Achievement Quest not found or already completed');
       }
-      userStats.xpToNextLevel = (userStats.level * 1000) - (userStats.totalXP % 1000);
-      Alert.alert('Quest Complete!', `You earned +${weeklyWinQuest.xpReward} XP for recording a weekly win!`);
     }
 
     closeModal();
-    loadData();
+    await loadData();
+    
+    // Force refresh of user stats in parent components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('userStatsUpdated'));
+    }
   };
 
   const getMoodIcon = (mood: JournalEntry['mood']) => {
@@ -347,7 +768,7 @@ export default function WarJournalScreen() {
 
   // Add getTabIcon function for tab icons
   const getTabIcon = (tab: TabType, isActive: boolean) => {
-    const color = isActive ? '#6366f1' : '#9ca3af';
+    const color = isActive ? '#ffffff' : '#9ca3af';
     const size = 20;
     switch (tab) {
       case 'quests':
@@ -370,6 +791,7 @@ export default function WarJournalScreen() {
     <TouchableOpacity
       style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
       onPress={() => setActiveTab(tab)}
+      testID={`journal-tab-${tab}`}
     >
       {getTabIcon(tab, activeTab === tab)}
       <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
@@ -432,12 +854,21 @@ export default function WarJournalScreen() {
                   <Text style={styles.questFrequency}>{quest.frequency}</Text>
                 </View>
                 <Text style={styles.systemQuestInstruction}>
-                  {quest.id === 'daily-journal' && 'Complete this by writing a journal entry.'}
-                  {quest.id === 'weekly-win' && 'Complete this by recording a weekly win.'}
-                  {quest.id === 'monthly-goal' && 'Complete this by setting a monthly goal.'}
-                  {quest.id === 'core-values' && 'Complete this by updating your core values.'}
-                  {!['daily-journal','weekly-win','monthly-goal','core-values'].includes(quest.id) && 'Complete this by using the app features.'}
+                  {quest.title === 'Daily Journal Entry' && 'Complete this by writing a journal entry.'}
+                  {quest.title === 'Weekly Achievement' && 'Complete this by recording a weekly achievement.'}
+                  {quest.title === 'Weekly Goal Setting' && 'Complete this by setting a weekly goal.'}
+                  {quest.title === 'Core Values Reflection' && 'Complete this by updating your core values.'}
+                  {!['Daily Journal Entry','Weekly Achievement','Weekly Goal Setting','Core Values Reflection'].includes(quest.title) && 'Complete this by using the app features.'}
                 </Text>
+                {quest.title === 'Daily Journal Entry' && (
+                  <TouchableOpacity 
+                    style={styles.goButton}
+                    onPress={() => setActiveTab('journal')}
+                    testID="journal-daily-journal-go-button"
+                  >
+                    <Text style={styles.goButtonText}>Go</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))
           ) : (
@@ -451,19 +882,19 @@ export default function WarJournalScreen() {
           )}
         </View>
 
-        {/* Goal-Based Quests Section */}
-        {goalBasedQuests.length > 0 ? (
+        {/* Story Quests Section */}
         <View style={styles.questSection}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
                 <Target size={24} color="#3B82F6" />
-                <Text style={styles.sectionTitle}>Goal-Based Quests</Text>
+                <Text style={styles.sectionTitle}>Story Quests</Text>
             </View>
           </View>
           <Text style={styles.sectionDescription}>
-              Quests generated to help you achieve your specific goals
+              Quests generated to help you achieve your specific goals and advance your story
           </Text>
-            {goalBasedQuests.map(task => (
+          {goalBasedQuests.length > 0 ? (
+            goalBasedQuests.map(task => (
               <View key={task.id} style={styles.questCard}>
                 <View style={styles.questHeader}>
                   <Text style={styles.questTitle}>{task.title}</Text>
@@ -480,12 +911,12 @@ export default function WarJournalScreen() {
                 <TouchableOpacity 
                   style={styles.completeButton}
                   onPress={() => handleCompleteTask(task.id)}
+                  testID={`journal-complete-goal-quest-${task.id}`}
                 >
                   <Text style={styles.completeButtonText}>Complete Quest</Text>
                 </TouchableOpacity>
               </View>
-            ))}
-          </View>
+            ))
         ) : (
           <View style={styles.emptyQuestState}>
             <Target size={48} color="#374151" />
@@ -497,9 +928,11 @@ export default function WarJournalScreen() {
               title="Create Goal"
               onPress={() => openModal('goal')}
               style={{ marginTop: 16 }}
+                testID="journal-create-goal-button"
             />
         </View>
         )}
+        </View>
 
         {/* AI Quests Section (Bonus Quests) */}
           <View style={styles.questSection}>
@@ -538,6 +971,7 @@ export default function WarJournalScreen() {
                 <TouchableOpacity 
                   style={styles.completeButton}
                   onPress={() => handleCompleteTask(task.id)}
+                  testID={`journal-complete-ai-quest-${task.id}`}
                 >
                   <Text style={styles.completeButtonText}>Complete Quest</Text>
                 </TouchableOpacity>
@@ -555,6 +989,7 @@ export default function WarJournalScreen() {
                 onPress={handleGenerateAIQuests}
                 disabled={isGeneratingQuests}
                 style={{ marginTop: 16 }}
+                testID="journal-generate-ai-quests-button"
               />
           </View>
         )}
@@ -619,6 +1054,7 @@ export default function WarJournalScreen() {
         <GlowingButton
           title="New Entry"
           onPress={() => openModal('journal')}
+          testID="journal-new-entry-button"
         />
       </View>
       
@@ -1016,17 +1452,27 @@ export default function WarJournalScreen() {
             <Text style={styles.title}>War Journal</Text>
             <Text style={styles.subtitle}>Track your journey to greatness</Text>
           </View>
+          <View style={styles.headerRight}>
           <TouchableOpacity 
             style={styles.inboxButton}
             onPress={() => router.push('/inbox')}
+              testID="journal-inbox-button"
           >
-            <Mail size={24} color="#FFF" />
+              <Mail size={20} color="#6366f1" />
             {unreadMessages > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{unreadMessages}</Text>
               </View>
             )}
           </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.settingsButton}
+              onPress={() => router.push('/settings')}
+              testID="journal-settings-button"
+            >
+              <Settings size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.tabContainer}>
@@ -1067,6 +1513,11 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   title: {
     fontFamily: 'Orbitron-Black',
     fontSize: 24,
@@ -1080,22 +1531,31 @@ const styles = StyleSheet.create({
   inboxButton: {
     position: 'relative',
     padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#6366f1',
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: -2,
+    right: -2,
     backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    minWidth: 16,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   badgeText: {
-    color: '#ffffff',
-    fontSize: 12,
     fontFamily: 'Orbitron-Bold',
+    fontSize: 9,
+    color: '#ffffff',
+  },
+  settingsButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#1f2937',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -1247,6 +1707,20 @@ const styles = StyleSheet.create({
   completeButtonText: {
     fontFamily: 'Orbitron-Bold',
     fontSize: 14,
+    color: '#ffffff',
+  },
+  goButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: '#6366f1',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  goButtonText: {
+    fontFamily: 'Orbitron-Bold',
+    fontSize: 12,
     color: '#ffffff',
   },
   journalCard: {

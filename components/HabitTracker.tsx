@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Switch, Button } from 'react-native';
 import { Target, Plus, Flame, Bell, Clock, CheckCircle, Calendar, TrendingUp, Settings, BellOff, Trash2 } from 'lucide-react-native';
 import GlowingButton from './GlowingButton';
-import { getHabits, addHabit, updateHabit, deleteHabit, toggleHabitCompletion, cleanupTemplateHabits } from '@/utils/storage';
+import { getUserHabits, createHabit, updateHabit, deleteHabit } from '@/utils/supabaseStorage';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Habit {
   id: string;
@@ -23,6 +24,7 @@ interface ReminderSettings {
 }
 
 export default function HabitTracker() {
+  const { user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [showAddHabit, setShowAddHabit] = useState(false);
   const [showReminderSettings, setShowReminderSettings] = useState(false);
@@ -41,15 +43,22 @@ export default function HabitTracker() {
   const categories = ['Personal', 'Health', 'Learning', 'Work', 'Relationships'];
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  // Load habits from storage on component mount
+  // Load habits from database on component mount
   useEffect(() => {
-    // Clean up any existing template-based habits
-    cleanupTemplateHabits();
-    
-    // Load habits from storage
-    const storedHabits = getHabits();
-    setHabits(storedHabits);
-  }, []);
+    if (user) {
+      loadHabits();
+    }
+  }, [user]);
+
+  const loadHabits = async () => {
+    if (!user) return;
+    try {
+      const userHabits = await getUserHabits(user.id);
+      setHabits(userHabits);
+    } catch (error) {
+      console.error('Error loading habits:', error);
+    }
+  };
 
   // Sample habit templates
   const habitTemplates = [
@@ -105,25 +114,26 @@ export default function HabitTracker() {
     setter('');
   };
 
-  const createHabit = () => {
-    if (newHabitName.trim()) {
-      const newHabit: Habit = {
-        id: Date.now().toString(),
-        name: newHabitName.trim(),
-        streak: 0,
-        completed: false,
-        reminder: newHabitTime,
-        reminderEnabled: reminderSettings.enabled,
-        category: selectedCategory,
-        createdAt: new Date(),
-      };
+  const handleCreateHabit = async () => {
+    if (!user || !newHabitName.trim()) return;
+    
+    const newHabit: Habit = {
+      id: Date.now().toString(),
+      name: newHabitName.trim(),
+      streak: 0,
+      completed: false,
+      reminder: newHabitTime,
+      reminderEnabled: reminderSettings.enabled,
+      category: selectedCategory,
+      createdAt: new Date(),
+    };
+    
+    try {
+      // Add to database
+      await createHabit(user.id, newHabit);
       
-      // Add to storage
-      addHabit(newHabit);
-      
-      // Reload from storage to avoid duplicates
-      const storedHabits = getHabits();
-      setHabits(storedHabits);
+      // Reload from database to avoid duplicates
+      await loadHabits();
       
       setNewHabitName('');
       setNewHabitTime('09:00');
@@ -132,16 +142,28 @@ export default function HabitTracker() {
       if (reminderSettings.enabled) {
         scheduleReminder(newHabit);
       }
+    } catch (error) {
+      console.error('Error creating habit:', error);
+      Alert.alert('Error', 'Failed to create habit. Please try again.');
     }
   };
 
-  const toggleHabit = (habitId: string) => {
-    // Update in storage
-    toggleHabitCompletion(habitId);
-    
-    // Reload from storage to ensure consistency
-    const storedHabits = getHabits();
-    setHabits(storedHabits);
+  const toggleHabit = async (habitId: string) => {
+    if (!user) return;
+    try {
+      // Find the habit to toggle
+      const habit = habits.find(h => h.id === habitId);
+      if (!habit) return;
+      
+      // Update in database
+      await updateHabit(habitId, { completed: !habit.completed });
+      
+      // Reload from database to ensure consistency
+      await loadHabits();
+    } catch (error) {
+      console.error('Error toggling habit:', error);
+      Alert.alert('Error', 'Failed to update habit. Please try again.');
+    }
   };
 
   const createFromTemplate = (template: typeof habitTemplates[0]) => {
@@ -197,15 +219,19 @@ export default function HabitTracker() {
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             console.log('Deleting habit:', habit.name);
-            // Remove from storage
-            deleteHabit(habit.id);
-            // Reload from storage
-            const storedHabits = getHabits();
-            setHabits(storedHabits);
-            if (habit.reminderEnabled) {
-              cancelReminder(habit);
+            try {
+              // Remove from database
+              await deleteHabit(habit.id);
+              // Reload from database
+              await loadHabits();
+              if (habit.reminderEnabled) {
+                cancelReminder(habit);
+              }
+            } catch (error) {
+              console.error('Error deleting habit:', error);
+              Alert.alert('Error', 'Failed to delete habit. Please try again.');
             }
           }
         }
@@ -219,16 +245,20 @@ export default function HabitTracker() {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (habitToDelete) {
       console.log('Deleting habit:', habitToDelete.name);
-      // Remove from storage
-      deleteHabit(habitToDelete.id);
-      // Reload from storage
-      const storedHabits = getHabits();
-      setHabits(storedHabits);
-      if (habitToDelete.reminderEnabled) {
-        cancelReminder(habitToDelete);
+      try {
+        // Remove from database
+        await deleteHabit(habitToDelete.id);
+        // Reload from database
+        await loadHabits();
+        if (habitToDelete.reminderEnabled) {
+          cancelReminder(habitToDelete);
+        }
+      } catch (error) {
+        console.error('Error deleting habit:', error);
+        Alert.alert('Error', 'Failed to delete habit. Please try again.');
       }
     }
     setShowDeleteConfirm(false);
@@ -301,6 +331,7 @@ export default function HabitTracker() {
             <TouchableOpacity 
               style={styles.settingsButton}
               onPress={() => setShowReminderSettings(!showReminderSettings)}
+              testID="habit-tracker-reminder-settings-button"
             >
               <Settings size={20} color="#f59e0b" />
             </TouchableOpacity>
@@ -327,6 +358,7 @@ export default function HabitTracker() {
                   keyboardType="numeric"
                   maxLength={5}
                   onFocus={() => handleTimeFocus((value) => setReminderSettings(prev => ({ ...prev, time: value })))}
+                  testID="habit-tracker-reminder-time-input"
                 />
               </View>
             </View>
@@ -356,6 +388,7 @@ export default function HabitTracker() {
           <TouchableOpacity 
             style={styles.addButton}
             onPress={() => setShowAddHabit(true)}
+            testID="habit-tracker-add-habit-button"
           >
             <Plus size={20} color="#10b981" />
           </TouchableOpacity>
@@ -369,6 +402,7 @@ export default function HabitTracker() {
               placeholderTextColor="#6b7280"
               value={newHabitName}
               onChangeText={setNewHabitName}
+              testID="habit-tracker-habit-name-input"
             />
             <View style={styles.categorySelector}>
               {categories.map(category => (
@@ -379,6 +413,7 @@ export default function HabitTracker() {
                     selectedCategory === category && styles.selectedCategoryChip
                   ]}
                   onPress={() => setSelectedCategory(category)}
+                  testID={`habit-tracker-category-${category.toLowerCase()}`}
                 >
                   <Text style={[
                     styles.categoryChipText,
@@ -403,6 +438,7 @@ export default function HabitTracker() {
                   keyboardType="numeric"
                   maxLength={5}
                   onFocus={() => handleTimeFocus(setNewHabitTime)}
+                  testID="habit-tracker-habit-time-input"
                 />
               </View>
             </View>
@@ -413,12 +449,14 @@ export default function HabitTracker() {
                 onPress={() => setShowAddHabit(false)}
                 variant="secondary"
                 style={styles.formButton}
+                testID="habit-tracker-cancel-button"
               />
               <GlowingButton
                 title="Add Habit"
-                onPress={createHabit}
+                onPress={handleCreateHabit}
                 variant="primary"
                 style={styles.formButton}
+                testID="habit-tracker-add-habit-submit-button"
               />
             </View>
           </View>
@@ -441,6 +479,7 @@ export default function HabitTracker() {
                   style={[styles.habitCard, habit.completed && styles.completedHabitCard]}
                   onPress={() => toggleHabit(habit.id)}
                   activeOpacity={0.8}
+                  testID={`habit-tracker-toggle-${habit.id}`}
                 >
                   <View style={styles.habitInfo}>
                     <Text style={[styles.habitName, habit.completed && styles.completedHabitName]}>
@@ -463,6 +502,7 @@ export default function HabitTracker() {
                 <TouchableOpacity
                   style={[styles.habitReminderToggle, habit.reminderEnabled && styles.habitReminderToggleActive]}
                   onPress={() => toggleReminder(habit.id)}
+                  testID={`habit-tracker-reminder-toggle-${habit.id}`}
                 >
                   {habit.reminderEnabled ? (
                     <Bell size={16} color="#f59e0b" />

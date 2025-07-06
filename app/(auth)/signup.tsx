@@ -6,8 +6,9 @@ import { Crown, Mail, Lock, Eye, EyeOff, User, Zap, Target, Sword, Star, Shield,
 import { supabase } from '@/lib/supabase';
 import GlowingButton from '@/components/GlowingButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { createDefaultSystemQuests } from '@/utils/supabaseStorage';
 
-type ClassType = 'warrior' | 'mage' | 'assassin' | 'vagabond' | 'hunter';
+type ClassType = 'berserker' | 'shinobi' | 'sage' | 'vagabond';
 type FocusArea = 'business' | 'fitness' | 'intelligence';
 type AuraColor = 'red' | 'green' | 'blue';
 
@@ -22,16 +23,15 @@ export default function SignUpScreen() {
   const [error, setError] = useState<string>('');
   
   // Character customization
-  const [selectedClass, setSelectedClass] = useState<ClassType>('hunter');
+  const [selectedClass, setSelectedClass] = useState<ClassType>('vagabond');
   const [selectedFocusArea, setSelectedFocusArea] = useState<FocusArea>('intelligence');
   const [selectedAuraColor, setSelectedAuraColor] = useState<AuraColor>('blue');
 
   const classes = [
-    { id: 'warrior', name: 'Warrior', icon: <Sword size={20} color="#ef4444" />, color: '#ef4444', description: 'Strength and courage' },
-    { id: 'mage', name: 'Mage', icon: <Star size={20} color="#8b5cf6" />, color: '#8b5cf6', description: 'Wisdom and magic' },
-    { id: 'assassin', name: 'Assassin', icon: <Zap size={20} color="#10b981" />, color: '#10b981', description: 'Speed and precision' },
-    { id: 'vagabond', name: 'Vagabond', icon: <Crown size={20} color="#f59e0b" />, color: '#f59e0b', description: 'Charisma and adaptability' },
-    { id: 'hunter', name: 'Hunter', icon: <Target size={20} color="#6366f1" />, color: '#6366f1', description: 'Tracking and survival' },
+    { id: 'berserker', name: 'Berserker', icon: <Sword size={20} color="#ef4444" />, color: '#ef4444', description: 'Unstoppable fury and raw power' },
+    { id: 'shinobi', name: 'Shinobi', icon: <Zap size={20} color="#8b5cf6" />, color: '#8b5cf6', description: 'Shadow mastery and stealth' },
+    { id: 'sage', name: 'Sage', icon: <Star size={20} color="#10b981" />, color: '#10b981', description: 'Ancient wisdom and knowledge' },
+    { id: 'vagabond', name: 'Vagabond', icon: <Crown size={20} color="#3b82f6" />, color: '#3b82f6', description: 'Adaptable wanderer and survivor' },
   ];
 
   const focusAreas = [
@@ -175,7 +175,10 @@ export default function SignUpScreen() {
             tasks_completed: 0,
             goals_completed: 0,
             streak: 0,
-            title: 'E-Rank Hunter',
+            title: 'E-Rank Awakened',
+            role: 'user',
+            developer_permissions: {},
+            admin_permissions: {},
           });
 
         if (profileError) {
@@ -199,6 +202,10 @@ export default function SignUpScreen() {
         }
 
         console.log('Profile created successfully!');
+        
+        // Create default system quests for the new user
+        console.log('🎯 Creating default system quests for new user...');
+        await createDefaultSystemQuests(authData.user.id);
 
         Alert.alert(
           'Success!',
@@ -270,6 +277,7 @@ export default function SignUpScreen() {
                       }}
                       autoCapitalize="none"
                       autoCorrect={false}
+                      testID="signup-username-input"
                     />
                   </View>
                 </View>
@@ -289,6 +297,7 @@ export default function SignUpScreen() {
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
+                      testID="signup-email-input"
                     />
                   </View>
                 </View>
@@ -308,10 +317,12 @@ export default function SignUpScreen() {
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
+                      testID="signup-password-input"
                     />
                     <TouchableOpacity
                       style={styles.eyeButton}
                       onPress={() => setShowPassword(!showPassword)}
+                      testID="signup-toggle-password-visibility"
                     >
                       {showPassword ? (
                         <EyeOff size={20} color="#9ca3af" />
@@ -337,10 +348,12 @@ export default function SignUpScreen() {
                       secureTextEntry={!showConfirmPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
+                      testID="signup-confirm-password-input"
                     />
                     <TouchableOpacity
                       style={styles.eyeButton}
                       onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      testID="signup-toggle-confirm-password-visibility"
                     >
                       {showConfirmPassword ? (
                         <EyeOff size={20} color="#9ca3af" />
@@ -369,6 +382,7 @@ export default function SignUpScreen() {
                           { borderColor: classItem.color }
                         ]}
                         onPress={() => setSelectedClass(classItem.id as ClassType)}
+                        testID={`signup-class-${classItem.id}`}
                       >
                         {classItem.icon}
                         <Text style={[
@@ -394,6 +408,7 @@ export default function SignUpScreen() {
                           selectedFocusArea === focus.id && styles.selectedFocusOption
                         ]}
                         onPress={() => setSelectedFocusArea(focus.id as FocusArea)}
+                        testID={`signup-focus-${focus.id}`}
                       >
                         {focus.icon}
                         <Text style={[
@@ -420,6 +435,7 @@ export default function SignUpScreen() {
                           selectedAuraColor === aura.id && styles.selectedAuraOption
                         ]}
                         onPress={() => setSelectedAuraColor(aura.id as AuraColor)}
+                        testID={`signup-aura-${aura.id}`}
                       >
                         <Text style={styles.auraOptionText}>
                           {aura.name}
@@ -436,12 +452,16 @@ export default function SignUpScreen() {
                 variant="primary"
                 style={styles.signUpButton}
                 disabled={loading}
+                testID="signup-submit-button"
               />
 
               {/* Login Link */}
               <View style={styles.footer}>
                 <Text style={styles.footerText}>Already have an account?</Text>
-                <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+                <TouchableOpacity 
+                  onPress={() => router.push('/(auth)/login')}
+                  testID="signup-login-link"
+                >
                   <Text style={styles.loginLink}>Login</Text>
                 </TouchableOpacity>
               </View>
@@ -450,6 +470,7 @@ export default function SignUpScreen() {
               <TouchableOpacity 
                 style={styles.testConnectionButton}
                 onPress={() => router.push('/test-connection')}
+                testID="signup-test-connection-button"
               >
                 <Text style={styles.testConnectionText}>Test Database Connection</Text>
               </TouchableOpacity>

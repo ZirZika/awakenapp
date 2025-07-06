@@ -19,6 +19,9 @@ export interface Database {
           goals_completed: number;
           streak: number;
           title: string;
+          role: 'user' | 'developer' | 'admin';
+          developer_permissions: Record<string, any> | null;
+          admin_permissions: Record<string, any> | null;
           created_at: string;
           updated_at: string;
         };
@@ -39,6 +42,9 @@ export interface Database {
           goals_completed?: number;
           streak?: number;
           title?: string;
+          role?: 'user' | 'developer' | 'admin';
+          developer_permissions?: Record<string, any> | null;
+          admin_permissions?: Record<string, any> | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -59,6 +65,9 @@ export interface Database {
           goals_completed?: number;
           streak?: number;
           title?: string;
+          role?: 'user' | 'developer' | 'admin';
+          developer_permissions?: Record<string, any> | null;
+          admin_permissions?: Record<string, any> | null;
           created_at?: string;
           updated_at?: string;
         };

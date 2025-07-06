@@ -496,6 +496,7 @@ export default function PomodoroTimer() {
               }
             }}
             activeOpacity={0.8}
+            testID={`pomodoro-mode-${mode.id}`}
           >
             <View style={styles.modeHeader}>
               <View style={[styles.modeIconContainer, { backgroundColor: `${mode.color}20` }]}>
@@ -555,6 +556,7 @@ export default function PomodoroTimer() {
           style={styles.customTimerButton}
           onPress={scrollToSettings}
           activeOpacity={0.8}
+          testID="pomodoro-custom-timer-button"
         >
           <Settings size={16} color="#6366f1" />
           <Text style={styles.customTimerText}>Custom Timer</Text>
@@ -586,6 +588,7 @@ export default function PomodoroTimer() {
             ]}
             onPress={() => setShowModeSelection(!showModeSelection)}
             activeOpacity={0.8}
+            testID="pomodoro-change-mode-button"
           >
             <Zap size={16} color="#6366f1" />
             <Text style={styles.changeModeText}>
@@ -652,6 +655,7 @@ export default function PomodoroTimer() {
               <TouchableOpacity
                 style={[styles.controlButton, styles.playButton, { backgroundColor: getPhaseColor() }]}
                 onPress={startTimer}
+                testID="pomodoro-start-button"
               >
                 <Play size={24} color="#ffffff" />
                 <Text style={styles.controlButtonText}>Start</Text>
@@ -660,6 +664,7 @@ export default function PomodoroTimer() {
               <TouchableOpacity
                 style={[styles.controlButton, styles.pauseButton]}
                 onPress={pauseTimer}
+                testID="pomodoro-pause-button"
               >
                 <Pause size={24} color="#ffffff" />
                 <Text style={styles.controlButtonText}>Pause</Text>
@@ -672,6 +677,7 @@ export default function PomodoroTimer() {
                 console.log('RESET BUTTON CLICKED!');
                 resetTimer();
               }}
+              testID="pomodoro-reset-button"
             >
               <RotateCcw size={20} color="#ffffff" />
             </TouchableOpacity>

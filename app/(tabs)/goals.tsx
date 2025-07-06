@@ -8,10 +8,12 @@ import ToolModal from '@/components/ToolModal';
 import HabitTracker from '@/components/HabitTracker';
 import Notes from '@/components/Notes';
 import PomodoroTimer from '@/components/PomodoroTimer';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 export default function ToolsScreen() {
-  // Mock unread message count
-  const [unreadMessages] = useState(3);
+  const { user } = useAuth();
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
 
   const tools = [
@@ -54,6 +56,22 @@ export default function ToolsScreen() {
     ? tools 
     : tools.filter(tool => tool.category === selectedCategory);
 
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnreadCount = async () => {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('type', 'system')
+        .eq('is_read', false);
+      if (!error && typeof count === 'number') {
+        setUnreadMessages(count);
+      }
+    };
+    fetchUnreadCount();
+  }, [user]);
+
   const handleToolPress = (tool: typeof tools[0]) => {
     setSelectedTool(tool.id);
   };
@@ -91,6 +109,7 @@ export default function ToolsScreen() {
       style={styles.toolCard}
       onPress={() => handleToolPress(tool)}
       activeOpacity={0.8}
+      testID={`goals-tool-card-${tool.id}`}
     >
       <View style={styles.toolHeader}>
         <View style={[styles.toolIconContainer, { backgroundColor: `${tool.color}20` }]}>
@@ -124,6 +143,7 @@ export default function ToolsScreen() {
           onPress={() => handleToolPress(tool)}
           variant="primary"
           style={styles.toolButton}
+          testID={`goals-tool-button-${tool.id}`}
         />
       </View>
     </TouchableOpacity>
@@ -141,6 +161,8 @@ export default function ToolsScreen() {
           <View style={styles.headerRight}>
             <TouchableOpacity 
               style={styles.inboxButton}
+              onPress={() => router.push('/inbox')}
+              testID="goals-inbox-button"
             >
               <Mail size={20} color="#6366f1" />
               {unreadMessages > 0 && (
@@ -151,6 +173,8 @@ export default function ToolsScreen() {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.settingsButton}
+              onPress={() => router.push('/settings')}
+              testID="goals-settings-button"
             >
               <Settings size={20} color="#9ca3af" />
             </TouchableOpacity>
@@ -183,6 +207,7 @@ export default function ToolsScreen() {
                     selectedCategory === category && styles.activeCategoryButton
                   ]}
                   onPress={() => setSelectedCategory(category)}
+                  testID={`goals-category-${category.toLowerCase()}`}
                 >
                   <Text style={[
                     styles.categoryButtonText,

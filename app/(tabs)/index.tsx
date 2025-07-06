@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, Modal, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Settings, Clock, Plus, CircleCheck as CheckCircle2, Circle, Zap, Target, Flame, Trophy, Sword, Crown, Mail, Sparkles, Trash2, RotateCcw } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { Task, UserStats } from '@/types/app';
-import { getTasks, getUserStats, completeTask } from '@/utils/storage';
+import { Task, UserStats, CompletedQuest } from '@/types/app';
+
+import { getUserDailyTasks, createDailyTask, updateDailyTask, updateUserStats, getUserTasks, getUserCompletedQuests } from '@/utils/supabaseStorage';
+import { cleanupDuplicateDailyTasks } from '@/utils/cleanupDuplicates';
+import { resetDailyTasks } from '@/utils/resetDailyTasks';
 import ProgressBar from '@/components/ProgressBar';
 import GlowingButton from '@/components/GlowingButton';
 import { scale, scaleFont } from '../../utils/config';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import InboxScreen from '../inbox';
 
 // Add DailyTask type
 interface DailyTask {
@@ -35,12 +37,9 @@ export default function HubScreen() {
     tasksCompleted: 0,
     goalsCompleted: 0,
     streak: 0,
-    title: 'E-Rank Hunter',
+    title: 'E-Rank Awakened',
   });
 
-  const [allTasks, setAllTasks] = useState<Task[]>([]);
-  const [completedQuests, setCompletedQuests] = useState<Task[]>([]);
-  const [incompleteTasks, setIncompleteTasks] = useState<Task[]>([]);
   const [timeLeft, setTimeLeft] = useState('23:45:12');
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [personalTodos, setPersonalTodos] = useState([
@@ -51,16 +50,16 @@ export default function HubScreen() {
   const [showAddTodoModal, setShowAddTodoModal] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
   const [showAllTodosModal, setShowAllTodosModal] = useState(false);
-  const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([
-    { id: '1', title: 'Drink 8 glasses of water', completed: false, xpReward: 25 },
-    { id: '2', title: 'Get 15 minutes of sunlight', completed: false, xpReward: 30 },
-    { id: '3', title: 'Write a journal entry', completed: false, xpReward: 50 },
-    { id: '4', title: 'Practice gratitude', completed: false, xpReward: 35 },
-  ]);
+  const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
   const [undoTimers, setUndoTimers] = useState<{ [key: string]: string }>({});
+  const [loadingDailyTasks, setLoadingDailyTasks] = useState(false);
+  const dailyTasksLoadedRef = useRef(false);
+  const [completedQuests, setCompletedQuests] = useState<CompletedQuest[]>([]);
 
   useEffect(() => {
     loadData();
+    loadDailyTasks();
+    loadCompletedQuests();
     const timer = setInterval(() => {
       const now = new Date();
       const tomorrow = new Date(now);
@@ -73,19 +72,74 @@ export default function HubScreen() {
       setTimeLeft(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
     }, 1000);
     return () => clearInterval(timer);
+  }, [user]);
+
+  // Listen for user stats updates from other components
+  useEffect(() => {
+    const handleUserStatsUpdate = () => {
+      console.log('🔄 User stats update event received, refreshing...');
+      loadData();
+      loadCompletedQuests();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('userStatsUpdated', handleUserStatsUpdate);
+      return () => window.removeEventListener('userStatsUpdated', handleUserStatsUpdate);
+    }
   }, []);
+
+  // Timer for undo countdown
+  useEffect(() => {
+    const undoTimer = setInterval(() => {
+      setUndoTimers(prevTimers => {
+        const newTimers = { ...prevTimers };
+        Object.keys(newTimers).forEach(taskId => {
+          const task = dailyTasks.find(t => t.id === taskId);
+          if (task && task.canUndo && task.undoExpiresAt) {
+            const now = Date.now();
+            const expiresAt = new Date(task.undoExpiresAt).getTime();
+            const timeLeft = Math.max(0, expiresAt - now);
+            
+            if (timeLeft > 0) {
+              const minutes = Math.floor(timeLeft / (1000 * 60));
+              const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+              newTimers[taskId] = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            } else {
+              // Time expired, remove undo capability
+              delete newTimers[taskId];
+              setDailyTasks(prev => prev.map(t => 
+                t.id === taskId 
+                  ? { ...t, canUndo: false, undoExpiresAt: undefined }
+                  : t
+              ));
+            }
+          } else {
+            // Task no longer has undo capability, remove timer
+            delete newTimers[taskId];
+          }
+        });
+        return newTimers;
+      });
+    }, 1000);
+    return () => clearInterval(undoTimer);
+  }, [dailyTasks]);
 
   useEffect(() => {
     if (!user) return;
     const fetchUnreadCount = async () => {
-      const { count, error } = await supabase
-        .from('messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('receiver_id', user.id)
-        .eq('type', 'system')
-        .eq('is_read', false);
-      if (!error && typeof count === 'number') {
-        setUnreadMessages(count);
+      try {
+        const { count, error } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', user.id)
+          .eq('type', 'system')
+          .eq('is_read', false);
+        if (!error && typeof count === 'number') {
+          setUnreadMessages(count);
+        }
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+        setUnreadMessages(0);
       }
     };
     fetchUnreadCount();
@@ -94,40 +148,94 @@ export default function HubScreen() {
   useEffect(() => {
     if (!user) return;
     const fetchProfile = async () => {
-      setLoadingProfile(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      if (!error && data) {
-        setProfile(data);
-        setUserStats({
-          level: data.level,
-          currentXP: data.current_xp,
-          totalXP: data.total_xp,
-          xpToNextLevel: (data.level * 1000) - (data.total_xp % 1000),
-          tasksCompleted: data.tasks_completed,
-          goalsCompleted: data.goals_completed,
-          streak: data.streak,
-          title: data.title,
-        });
+      try {
+        setLoadingProfile(true);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (!error && data) {
+          console.log('Fetched profile data:', data);
+          setProfile(data);
+          const stats = {
+            level: data.level,
+            currentXP: data.current_xp,
+            totalXP: data.total_xp,
+            xpToNextLevel: (data.level * 1000) - (data.total_xp % 1000),
+            tasksCompleted: data.tasks_completed,
+            goalsCompleted: data.goals_completed,
+            streak: data.streak,
+            title: data.title,
+          };
+          console.log('Setting initial userStats:', stats);
+          setUserStats(stats);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setLoadingProfile(false);
       }
-      setLoadingProfile(false);
     };
     fetchProfile();
   }, [user]);
 
   const loadData = () => {
-    const tasks = getTasks();
-    setAllTasks(tasks);
-    setCompletedQuests(tasks.filter(task => task.isCompleted).slice(0, 5));
-    setIncompleteTasks(tasks.filter(task => !task.isCompleted));
+    // This function is removed as per the instructions
+  };
+
+  const loadCompletedQuests = async () => {
+    if (!user) return;
+    try {
+      console.log('🔄 Loading completed quests for hub...');
+      const completed = await getUserCompletedQuests(user.id);
+      const recentCompleted = completed.slice(0, 5); // Show last 5 completed
+      console.log('✅ Loaded completed quests:', completed.length);
+      console.log('📋 Completed quests:', completed.map(t => ({ title: t.title, questType: t.questType })));
+      setCompletedQuests(recentCompleted);
+    } catch (error) {
+      console.error('❌ Error loading completed quests:', error);
+    }
+  };
+
+  const loadDailyTasks = async () => {
+    if (!user || loadingDailyTasks || dailyTasksLoadedRef.current) return;
+    setLoadingDailyTasks(true);
+    dailyTasksLoadedRef.current = true;
+    try {
+      // First, clean up any duplicates
+      await cleanupDuplicateDailyTasks(user.id);
+      
+      const tasks = await getUserDailyTasks(user.id);
+      if (tasks.length === 0) {
+        // Create default daily tasks if none exist
+        const defaultTasks = [
+          { title: 'Drink 8 glasses of water', xpReward: 25 },
+          { title: 'Get 15 minutes of sunlight', xpReward: 30 },
+          { title: 'Write a journal entry', xpReward: 50 },
+          { title: 'Practice gratitude', xpReward: 35 },
+        ];
+        
+        for (const task of defaultTasks) {
+          await createDailyTask(user.id, task);
+        }
+        
+        // Reload tasks after creating defaults
+        const newTasks = await getUserDailyTasks(user.id);
+        setDailyTasks(newTasks);
+      } else {
+        setDailyTasks(tasks);
+      }
+    } catch (error) {
+      console.error('Error loading daily tasks:', error);
+      dailyTasksLoadedRef.current = false; // Reset on error
+    } finally {
+      setLoadingDailyTasks(false);
+    }
   };
 
   const handleCompleteTask = (taskId: string) => {
-    completeTask(taskId);
-    loadData();
+    // This function is removed as per the instructions
   };
 
   const togglePersonalTodo = (todoId: string) => {
@@ -151,7 +259,7 @@ export default function HubScreen() {
   };
 
   const getUserTitle = (level: number): string => {
-    if (level >= 50) return 'Shadow Monarch';
+    if (level >= 50) return 'Awakened';
     if (level >= 40) return 'S-Rank Sage';
     if (level >= 30) return 'A-Rank Warrior';
     if (level >= 20) return 'B-Rank Guardian';
@@ -161,7 +269,7 @@ export default function HubScreen() {
   };
 
   const getTitleColor = (title: string): string => {
-    if (title.includes('Shadow Monarch')) return '#8b5cf6';
+    if (title.includes('Awakened')) return '#8b5cf6';
     if (title.includes('S-Rank')) return '#f59e0b';
     if (title.includes('A-Rank')) return '#ef4444';
     if (title.includes('B-Rank')) return '#3b82f6';
@@ -192,74 +300,131 @@ export default function HubScreen() {
 
   const completedDailyTasks = dailyTasks.filter(task => task.completed).length;
   const totalDailyTasks = dailyTasks.length;
-  const completedPersonalTodos = completedQuests.length;
+  const completedPersonalTodos = dailyTasks.length;
 
-  const toggleDailyTask = (taskId: string) => {
-    setDailyTasks(prev => {
-      const updatedTasks = prev.map(task => {
-        if (task.id === taskId) {
-          if (!task.completed) {
-            // Completing the task
-            const newStats = { ...userStats };
-            newStats.currentXP += task.xpReward;
-            newStats.totalXP += task.xpReward;
-            // Level up logic
-            const newLevel = Math.floor(newStats.totalXP / 1000) + 1;
-            if (newLevel > newStats.level) {
-              newStats.level = newLevel;
-              newStats.title = getUserTitle(newStats.level);
-            }
-            newStats.xpToNextLevel = (newStats.level * 1000) - (newStats.totalXP % 1000);
-            setUserStats(newStats);
-            const undoExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
-            setUndoTimers(prevTimers => ({ ...prevTimers, [task.id]: '5:00' }));
-            return {
-              ...task,
-              completed: true,
-              completedAt: new Date().toISOString(),
-              canUndo: true,
-              undoExpiresAt: undoExpiresAt.toISOString(),
-            };
-          } else if (task.canUndo) {
-            // Undoing the task
-            const newStats = { ...userStats };
-            newStats.currentXP -= task.xpReward;
-            newStats.totalXP -= task.xpReward;
-            // Level down logic
-            const newLevel = Math.floor(newStats.totalXP / 1000) + 1;
-            if (newLevel < newStats.level) {
-              newStats.level = newLevel;
-              newStats.title = getUserTitle(newStats.level);
-            }
-            newStats.xpToNextLevel = (newStats.level * 1000) - (newStats.totalXP % 1000);
-            setUserStats(newStats);
-            setUndoTimers(prevTimers => {
-              const newTimers = { ...prevTimers };
-              delete newTimers[task.id];
-              return newTimers;
-            });
-            return {
-              ...task,
-              completed: false,
-              completedAt: undefined,
-              canUndo: false,
-              undoExpiresAt: undefined,
-            };
-          }
+  const toggleDailyTask = async (taskId: string) => {
+    if (!user) return;
+    
+    const task = dailyTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    try {
+      if (!task.completed) {
+        // Completing the task
+        const undoExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        
+        await updateDailyTask(taskId, {
+          completed: true,
+          completedAt: new Date().toISOString(),
+          canUndo: true,
+          undoExpiresAt: undoExpiresAt.toISOString(),
+        });
+
+        // Update local state
+        setDailyTasks(prev => prev.map(t => 
+          t.id === taskId 
+            ? { ...t, completed: true, completedAt: new Date().toISOString(), canUndo: true, undoExpiresAt: undoExpiresAt.toISOString() }
+            : t
+        ));
+
+        // Update user stats
+        const newStats = { ...userStats };
+        newStats.currentXP += task.xpReward;
+        newStats.totalXP += task.xpReward;
+        newStats.tasksCompleted += 1;
+        
+        // Level up logic
+        const newLevel = Math.floor(newStats.totalXP / 1000) + 1;
+        if (newLevel > newStats.level) {
+          newStats.level = newLevel;
+          newStats.title = getUserTitle(newStats.level);
         }
-        return task;
-      });
-      return updatedTasks;
-    });
+        newStats.xpToNextLevel = (newStats.level * 1000) - (newStats.totalXP % 1000);
+        
+        console.log('Updating stats:', newStats);
+        setUserStats(newStats);
+        await updateUserStats(user.id, newStats);
+        
+        // Also update the profile state to keep it in sync
+        setProfile((prev: any) => prev ? {
+          ...prev,
+          level: newStats.level,
+          current_xp: newStats.currentXP,
+          total_xp: newStats.totalXP,
+          tasks_completed: newStats.tasksCompleted,
+          goals_completed: newStats.goalsCompleted,
+          streak: newStats.streak,
+          title: newStats.title,
+        } : prev);
+        
+        // Start undo timer
+        setUndoTimers(prevTimers => ({ ...prevTimers, [taskId]: '5:00' }));
+        
+      } else if (task.canUndo) {
+        // Undoing the task
+        await updateDailyTask(taskId, {
+          completed: false,
+          completedAt: undefined,
+          canUndo: false,
+          undoExpiresAt: undefined,
+        });
+
+        // Update local state
+        setDailyTasks(prev => prev.map(t => 
+          t.id === taskId 
+            ? { ...t, completed: false, completedAt: undefined, canUndo: false, undoExpiresAt: undefined }
+            : t
+        ));
+
+        // Update user stats
+        const newStats = { ...userStats };
+        newStats.currentXP -= task.xpReward;
+        newStats.totalXP -= task.xpReward;
+        newStats.tasksCompleted -= 1;
+        
+        // Level down logic
+        const newLevel = Math.floor(newStats.totalXP / 1000) + 1;
+        if (newLevel < newStats.level) {
+          newStats.level = newLevel;
+          newStats.title = getUserTitle(newStats.level);
+        }
+        newStats.xpToNextLevel = (newStats.level * 1000) - (newStats.totalXP % 1000);
+        
+        console.log('Undoing stats:', newStats);
+        setUserStats(newStats);
+        await updateUserStats(user.id, newStats);
+        
+        // Also update the profile state to keep it in sync
+        setProfile((prev: any) => prev ? {
+          ...prev,
+          level: newStats.level,
+          current_xp: newStats.currentXP,
+          total_xp: newStats.totalXP,
+          tasks_completed: newStats.tasksCompleted,
+          goals_completed: newStats.goalsCompleted,
+          streak: newStats.streak,
+          title: newStats.title,
+        } : prev);
+        
+        // Remove undo timer
+        setUndoTimers(prevTimers => {
+          const newTimers = { ...prevTimers };
+          delete newTimers[taskId];
+          return newTimers;
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling daily task:', error);
+    }
   };
 
-  const undoDailyTask = (taskId: string) => {
+  const undoDailyTask = async (taskId: string) => {
     const task = dailyTasks.find(t => t.id === taskId);
     if (task && task.completed && task.canUndo) {
       const now = new Date();
       const undoExpiresAt = new Date(task.undoExpiresAt || 0);
       if (now < undoExpiresAt) {
-        toggleDailyTask(taskId);
+        await toggleDailyTask(taskId);
         // Optionally show a toast/alert
       }
     }
@@ -288,19 +453,7 @@ export default function HubScreen() {
     return baseStyle;
   };
 
-  // When stats change, update Supabase
-  const updateProfileStats = async (stats: Partial<UserStats>) => {
-    if (!user) return;
-    await supabase.from('profiles').update({
-      level: stats.level,
-      current_xp: stats.currentXP,
-      total_xp: stats.totalXP,
-      tasks_completed: stats.tasksCompleted,
-      goals_completed: stats.goalsCompleted,
-      streak: stats.streak,
-      title: stats.title,
-    }).eq('id', user.id);
-  };
+
 
   return (
     <View style={styles.container}>
@@ -313,10 +466,11 @@ export default function HubScreen() {
               <Text style={styles.headerTitle}>The Hub</Text>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity 
-                style={styles.inboxButton}
-                onPress={() => router.push('/inbox')}
-              >
+                              <TouchableOpacity 
+                  style={styles.inboxButton}
+                  onPress={() => router.push('/inbox')}
+                  testID="inbox-button"
+                >
                 <Mail size={20} color="#6366f1" />
                 {unreadMessages > 0 && (
                   <View style={styles.inboxBadge}>
@@ -324,10 +478,11 @@ export default function HubScreen() {
                   </View>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.settingsButton}
-                onPress={() => router.push('/settings')}
-              >
+                              <TouchableOpacity 
+                  style={styles.settingsButton}
+                  onPress={() => router.push('/settings')}
+                  testID="settings-button"
+                >
                 <Settings size={20} color="#9ca3af" />
               </TouchableOpacity>
             </View>
@@ -417,6 +572,7 @@ export default function HubScreen() {
               <TouchableOpacity 
                 style={styles.dailyQuestCard}
                 onPress={() => router.push('/journal')}
+                testID="daily-quest-card"
               >
                 <LinearGradient
                   colors={['#1f2937', '#374151']}
@@ -496,7 +652,11 @@ export default function HubScreen() {
                       <Text style={styles.viewAllText}>View All</Text>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity style={styles.addButton} onPress={() => setShowAddTodoModal(true)}>
+                  <TouchableOpacity 
+                    style={styles.addButton} 
+                    onPress={() => setShowAddTodoModal(true)}
+                    testID="add-todo-button"
+                  >
                     <Plus size={20} color="#6366f1" />
                   </TouchableOpacity>
                 </View>
@@ -562,33 +722,19 @@ export default function HubScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Completed Quests</Text>
-                <TouchableOpacity onPress={() => router.push('/journal')}>
-                  <Text style={styles.viewAllText}>View All</Text>
-                </TouchableOpacity>
+                                  <TouchableOpacity 
+                    onPress={() => router.push('/journal')}
+                    testID="view-all-quests-button"
+                  >
+                    <Text style={styles.viewAllText}>View All</Text>
+                  </TouchableOpacity>
               </View>
               
               {completedQuests.length > 0 ? (
                 <View style={styles.questsContainer}>
                   {completedQuests.map(quest => (
                     <View key={quest.id} style={styles.completedQuestItem}>
-                      <View style={styles.questItemLeft}>
-                        <View style={styles.questTypeIcon}>
-                          {quest.questType === 'ai-generated' ? (
-                            <Sparkles size={16} color="#8B5CF6" />
-                          ) : quest.questType === 'goal-based' ? (
-                            <Target size={16} color="#3B82F6" />
-                          ) : (
-                            <Settings size={16} color="#10B981" />
-                          )}
-                        </View>
-                        <View style={styles.questInfo}>
-                          <Text style={styles.completedQuestTitle}>{quest.title}</Text>
-                          <Text style={styles.questType}>
-                            {quest.questType === 'ai-generated' ? 'AI Quest' : 
-                             quest.questType === 'goal-based' ? 'Goal Quest' : 'System Quest'}
-                          </Text>
-                        </View>
-                      </View>
+                      <Text style={styles.completedQuestTitle}>{quest.title}</Text>
                       <View style={styles.questReward}>
                         <Zap size={14} color="#FBBF24" />
                         <Text style={styles.questXP}>+{quest.xpReward}</Text>
@@ -1078,31 +1224,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#374151',
   },
-  questItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  questTypeIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#1f2937',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  questInfo: {
-    marginLeft: 12,
-  },
   completedQuestTitle: {
     fontFamily: 'Orbitron-Bold',
     fontSize: 14,
     color: '#ffffff',
     marginBottom: 4,
-  },
-  questType: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
   },
   questReward: {
     flexDirection: 'row',

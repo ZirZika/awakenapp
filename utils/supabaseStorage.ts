@@ -40,6 +40,46 @@ export const updateUserProfile = async (userId: string, updates: any) => {
 };
 
 export const updateUserStats = async (userId: string, stats: Partial<UserStats>) => {
+  console.log('updateUserStats called with userId:', userId, 'stats:', stats);
+  
+  // If we're only passing XP reward, we need to get current stats and add to them
+  if (stats.currentXP !== undefined && stats.totalXP === undefined) {
+    console.log('⚠️ Only currentXP provided, need to get current stats first');
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_xp, total_xp, level, tasks_completed, goals_completed, streak, title')
+      .eq('id', userId)
+      .single();
+    
+    if (profile) {
+      const newTotalXP = profile.total_xp + stats.currentXP;
+      const newLevel = Math.floor(newTotalXP / 1000) + 1;
+      const newTitle = getUserTitle(newLevel);
+      const newCurrentXP = newTotalXP % 1000; // XP within current level (0-999)
+      const newXPToNextLevel = 1000 - newCurrentXP; // XP needed to next level
+      
+      stats = {
+        ...stats,
+        currentXP: newCurrentXP,
+        totalXP: newTotalXP,
+        level: newLevel,
+        title: newTitle,
+        xpToNextLevel: newXPToNextLevel,
+        tasksCompleted: (profile.tasks_completed || 0) + (stats.tasksCompleted || 1)
+      };
+      
+      console.log('📊 Calculated new stats:', stats);
+      console.log('💰 XP Breakdown:', {
+        oldTotal: profile.total_xp,
+        earned: stats.currentXP,
+        newTotal: newTotalXP,
+        newCurrent: newCurrentXP,
+        newLevel: newLevel,
+        xpToNext: newXPToNextLevel
+      });
+    }
+  }
+  
   const { error } = await supabase
     .from('profiles')
     .update({
@@ -58,6 +98,19 @@ export const updateUserStats = async (userId: string, stats: Partial<UserStats>)
     console.error('Error updating user stats:', error);
     throw error;
   }
+  
+  console.log('✅ updateUserStats successful for userId:', userId);
+};
+
+// Helper function to get user title based on level
+const getUserTitle = (level: number): string => {
+  if (level >= 50) return 'Awakened';
+  if (level >= 40) return 'S-Rank Sage';
+  if (level >= 30) return 'A-Rank Warrior';
+  if (level >= 20) return 'B-Rank Guardian';
+  if (level >= 10) return 'C-Rank Hunter';
+  if (level >= 5) return 'D-Rank Apprentice';
+  return 'E-Rank Novice';
 };
 
 // Goals Functions
@@ -772,4 +825,581 @@ export const sendMessage = async (senderId: string, receiverId: string, title: s
   }
 
   return data;
+};
+
+// ============================================================================
+// DAILY TASKS FUNCTIONS
+// ============================================================================
+
+export const getUserDailyTasks = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('daily_tasks')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching daily tasks:', error);
+    return [];
+  }
+
+  return data.map(task => ({
+    id: task.id,
+    title: task.title,
+    xpReward: task.xp_reward,
+    completed: task.completed,
+    completedAt: task.completed_at,
+    canUndo: task.can_undo,
+    undoExpiresAt: task.undo_expires_at,
+    createdAt: task.created_at,
+  }));
+};
+
+export const createDailyTask = async (userId: string, task: {
+  title: string;
+  xpReward: number;
+}) => {
+  const { data, error } = await supabase
+    .from('daily_tasks')
+    .insert({
+      user_id: userId,
+      title: task.title,
+      xp_reward: task.xpReward,
+      completed: false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating daily task:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    xpReward: data.xp_reward,
+    completed: data.completed,
+    completedAt: data.completed_at,
+    canUndo: data.can_undo,
+    undoExpiresAt: data.undo_expires_at,
+    createdAt: data.created_at,
+  };
+};
+
+export const updateDailyTask = async (taskId: string, updates: {
+  completed?: boolean;
+  completedAt?: string;
+  canUndo?: boolean;
+  undoExpiresAt?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('daily_tasks')
+    .update({
+      completed: updates.completed,
+      completed_at: updates.completedAt,
+      can_undo: updates.canUndo,
+      undo_expires_at: updates.undoExpiresAt,
+    })
+    .eq('id', taskId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating daily task:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    xpReward: data.xp_reward,
+    completed: data.completed,
+    completedAt: data.completed_at,
+    canUndo: data.can_undo,
+    undoExpiresAt: data.undo_expires_at,
+    createdAt: data.created_at,
+  };
+};
+
+export const deleteDailyTask = async (taskId: string) => {
+  const { error } = await supabase
+    .from('daily_tasks')
+    .delete()
+    .eq('id', taskId);
+
+  if (error) {
+    console.error('Error deleting daily task:', error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// PERSONAL TODOS FUNCTIONS
+// ============================================================================
+
+export const getUserPersonalTodos = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('personal_todos')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching personal todos:', error);
+    return [];
+  }
+
+  return data.map(todo => ({
+    id: todo.id,
+    title: todo.title,
+    description: todo.description,
+    completed: todo.completed,
+    priority: todo.priority,
+    category: todo.category,
+    dueDate: todo.due_date,
+    completedAt: todo.completed_at,
+    createdAt: todo.created_at,
+  }));
+};
+
+export const createPersonalTodo = async (userId: string, todo: {
+  title: string;
+  description?: string;
+  priority: 'low' | 'medium' | 'high';
+  category: string;
+  dueDate?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('personal_todos')
+    .insert({
+      user_id: userId,
+      title: todo.title,
+      description: todo.description,
+      priority: todo.priority,
+      category: todo.category,
+      due_date: todo.dueDate,
+      completed: false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating personal todo:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    completed: data.completed,
+    priority: data.priority,
+    category: data.category,
+    dueDate: data.due_date,
+    completedAt: data.completed_at,
+    createdAt: data.created_at,
+  };
+};
+
+export const updatePersonalTodo = async (todoId: string, updates: {
+  title?: string;
+  description?: string;
+  completed?: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  category?: string;
+  dueDate?: string;
+  completedAt?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('personal_todos')
+    .update({
+      title: updates.title,
+      description: updates.description,
+      completed: updates.completed,
+      priority: updates.priority,
+      category: updates.category,
+      due_date: updates.dueDate,
+      completed_at: updates.completedAt,
+    })
+    .eq('id', todoId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating personal todo:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    completed: data.completed,
+    priority: data.priority,
+    category: data.category,
+    dueDate: data.due_date,
+    completedAt: data.completed_at,
+    createdAt: data.created_at,
+  };
+};
+
+export const deletePersonalTodo = async (todoId: string) => {
+  const { error } = await supabase
+    .from('personal_todos')
+    .delete()
+    .eq('id', todoId);
+
+  if (error) {
+    console.error('Error deleting personal todo:', error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// SYSTEM QUESTS FUNCTIONS
+// ============================================================================
+
+export const getUserSystemQuests = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('system_quests')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching system quests:', error);
+    return [];
+  }
+
+  return data.map(quest => ({
+    id: quest.id,
+    title: quest.title,
+    description: quest.description,
+    frequency: quest.frequency,
+    xpReward: quest.xp_reward,
+    difficulty: quest.difficulty,
+    category: quest.category,
+    isCompleted: quest.is_completed,
+    lastCompleted: quest.last_completed,
+    nextDue: quest.next_due,
+    createdAt: quest.created_at,
+  }));
+};
+
+export const createSystemQuest = async (userId: string, quest: {
+  title: string;
+  description: string;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'once';
+  xpReward: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Epic';
+  category: string;
+}) => {
+  const { data, error } = await supabase
+    .from('system_quests')
+    .insert({
+      user_id: userId,
+      title: quest.title,
+      description: quest.description,
+      frequency: quest.frequency,
+      xp_reward: quest.xpReward,
+      difficulty: quest.difficulty,
+      category: quest.category,
+      is_completed: false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating system quest:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    frequency: data.frequency,
+    xpReward: data.xp_reward,
+    difficulty: data.difficulty,
+    category: data.category,
+    isCompleted: data.is_completed,
+    lastCompleted: data.last_completed,
+    nextDue: data.next_due,
+    createdAt: data.created_at,
+  };
+};
+
+export const updateSystemQuest = async (questId: string, updates: {
+  isCompleted?: boolean;
+  lastCompleted?: string;
+  nextDue?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('system_quests')
+    .update({
+      is_completed: updates.isCompleted,
+      last_completed: updates.lastCompleted,
+      next_due: updates.nextDue,
+    })
+    .eq('id', questId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating system quest:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    frequency: data.frequency,
+    xpReward: data.xp_reward,
+    difficulty: data.difficulty,
+    category: data.category,
+    isCompleted: data.is_completed,
+    lastCompleted: data.last_completed,
+    nextDue: data.next_due,
+    createdAt: data.created_at,
+  };
+};
+
+export const createDefaultSystemQuests = async (userId: string) => {
+  console.log('🎯 Creating default system quests for user:', userId);
+  
+  const defaultQuests = [
+    {
+      title: 'Daily Journal Entry',
+      description: 'Write a journal entry to reflect on your day and track your progress',
+      frequency: 'daily' as const,
+      xpReward: 50,
+      difficulty: 'Easy' as const,
+      category: 'Personal',
+    },
+    {
+      title: 'Weekly Goal Setting',
+      description: 'Create a new goal to work towards this week',
+      frequency: 'weekly' as const,
+      xpReward: 100,
+      difficulty: 'Medium' as const,
+      category: 'Personal',
+    },
+    {
+      title: 'Core Values Reflection',
+      description: 'Add or update your core values to guide your decisions',
+      frequency: 'monthly' as const,
+      xpReward: 150,
+      difficulty: 'Medium' as const,
+      category: 'Personal',
+    },
+    {
+      title: 'Weekly Achievement',
+      description: 'Record a personal achievement or win from this week',
+      frequency: 'weekly' as const,
+      xpReward: 75,
+      difficulty: 'Easy' as const,
+      category: 'Personal',
+    },
+  ];
+
+  try {
+    for (const quest of defaultQuests) {
+      await createSystemQuest(userId, quest);
+      console.log('✅ Created system quest:', quest.title);
+    }
+    console.log('🎯 All default system quests created successfully');
+  } catch (error) {
+    console.error('❌ Error creating default system quests:', error);
+    // Don't throw error - we don't want to fail signup if system quests fail
+  }
+};
+
+// ============================================================================
+// AI GENERATED QUESTS FUNCTIONS
+// ============================================================================
+
+export const getUserAIGeneratedQuests = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('ai_generated_quests')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching AI generated quests:', error);
+    return [];
+  }
+
+  return data.map(quest => ({
+    id: quest.id,
+    title: quest.title,
+    description: quest.description,
+    xpReward: quest.xp_reward,
+    difficulty: quest.difficulty,
+    category: quest.category,
+    reasoning: quest.reasoning,
+    estimatedDuration: quest.estimated_duration,
+    isCompleted: quest.is_completed,
+    completedAt: quest.completed_at,
+    expiresAt: quest.expires_at,
+    createdAt: quest.created_at,
+  }));
+};
+
+export const createAIGeneratedQuest = async (userId: string, quest: {
+  title: string;
+  description: string;
+  xpReward: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Epic';
+  category: string;
+  reasoning?: string;
+  estimatedDuration?: string;
+  expiresAt?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('ai_generated_quests')
+    .insert({
+      user_id: userId,
+      title: quest.title,
+      description: quest.description,
+      xp_reward: quest.xpReward,
+      difficulty: quest.difficulty,
+      category: quest.category,
+      reasoning: quest.reasoning,
+      estimated_duration: quest.estimatedDuration,
+      expires_at: quest.expiresAt,
+      is_completed: false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating AI generated quest:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    xpReward: data.xp_reward,
+    difficulty: data.difficulty,
+    category: data.category,
+    reasoning: data.reasoning,
+    estimatedDuration: data.estimated_duration,
+    isCompleted: data.is_completed,
+    completedAt: data.completed_at,
+    expiresAt: data.expires_at,
+    createdAt: data.created_at,
+  };
+};
+
+export const updateAIGeneratedQuest = async (questId: string, updates: {
+  isCompleted?: boolean;
+  completedAt?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('ai_generated_quests')
+    .update({
+      is_completed: updates.isCompleted,
+      completed_at: updates.completedAt,
+    })
+    .eq('id', questId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating AI generated quest:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    xpReward: data.xp_reward,
+    difficulty: data.difficulty,
+    category: data.category,
+    reasoning: data.reasoning,
+    estimatedDuration: data.estimated_duration,
+    isCompleted: data.is_completed,
+    completedAt: data.completed_at,
+    expiresAt: data.expires_at,
+    createdAt: data.created_at,
+  };
+};
+
+export const deleteAIGeneratedQuest = async (questId: string) => {
+  const { error } = await supabase
+    .from('ai_generated_quests')
+    .delete()
+    .eq('id', questId);
+
+  if (error) {
+    console.error('Error deleting AI generated quest:', error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// COMPLETED QUESTS FUNCTIONS
+// ============================================================================
+
+export const createCompletedQuest = async (userId: string, quest: {
+  title: string;
+  description: string;
+  xpReward: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Epic';
+  category: string;
+  questType: 'system' | 'story' | 'ai' | 'daily';
+  completedAt: string;
+}) => {
+  const { data, error } = await supabase
+    .from('completed_quests')
+    .insert({
+      user_id: userId,
+      title: quest.title,
+      description: quest.description,
+      xp_reward: quest.xpReward,
+      difficulty: quest.difficulty,
+      category: quest.category,
+      quest_type: quest.questType,
+      completed_at: quest.completedAt,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating completed quest:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const getUserCompletedQuests = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('completed_quests')
+    .select('*')
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching completed quests:', error);
+    return [];
+  }
+
+  return data.map(quest => ({
+    id: quest.id,
+    title: quest.title,
+    description: quest.description,
+    xpReward: quest.xp_reward,
+    difficulty: quest.difficulty,
+    category: quest.category,
+    questType: quest.quest_type,
+    completedAt: quest.completed_at,
+    createdAt: quest.created_at,
+  }));
 };

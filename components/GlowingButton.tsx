@@ -9,6 +9,7 @@ interface GlowingButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   disabled?: boolean;
+  testID?: string;
 }
 
 export default function GlowingButton({ 
@@ -17,7 +18,8 @@ export default function GlowingButton({
   variant = 'primary', 
   style, 
   textStyle,
-  disabled = false 
+  disabled = false,
+  testID 
 }: GlowingButtonProps) {
   const buttonStyle = [
     styles.button,
@@ -39,6 +41,7 @@ export default function GlowingButton({
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.8}
+      testID={testID}
     >
       <Text style={buttonTextStyle}>{title}</Text>
     </TouchableOpacity>

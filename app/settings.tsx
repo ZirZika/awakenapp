@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Modal, TextInput, Alert, Switch, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { X, Settings as SettingsIcon, User, Mail, Lock, Bell, Shield, CircleHelp as HelpCircle, LogOut, ChevronRight, Eye, EyeOff, Check, CreditCard as Edit3, Camera, Zap, Crown, Brain, Target, Send, Bug, Lightbulb, MessageSquare, TriangleAlert as AlertTriangle, Clock } from 'lucide-react-native';
+import { X, Settings as SettingsIcon, User, Mail, Lock, Bell, Shield, CircleHelp as HelpCircle, LogOut, ChevronRight, Eye, EyeOff, Check, CreditCard as Edit3, Camera, Zap, Crown, Brain, Target, Send, Bug, Lightbulb, MessageSquare, TriangleAlert as AlertTriangle, Clock, Code } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import GlowingButton from '@/components/GlowingButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
+import DeveloperPanel from '@/components/DeveloperPanel';
 
 type ModalType = 'email' | 'password' | 'notifications' | 'profile' | 'focusGoal' | 'privacy' | 'support' | null;
 type AuraColor = 'red' | 'green' | 'blue';
@@ -20,6 +22,7 @@ export default function SettingsScreen() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [developerPanelVisible, setDeveloperPanelVisible] = useState(false);
   
   // Form states
   const [emailForm, setEmailForm] = useState({
@@ -36,7 +39,7 @@ export default function SettingsScreen() {
 
   const [profileForm, setProfileForm] = useState({
     username: 'ShadowWalker2024',
-    bio: 'E-Rank Hunter on a journey to become the strongest. Currently focusing on daily quests and personal growth.',
+    bio: 'E-Rank Awakened on a journey to become the strongest. Currently focusing on daily quests and personal growth.',
     location: 'Seoul, South Korea',
     profilePicture: 'https://images.pexels.com/photos/8721318/pexels-photo-8721318.jpeg?auto=compress&cs=tinysrgb&w=200&h=280&fit=crop',
     auraColor: 'blue' as AuraColor,
@@ -89,6 +92,15 @@ export default function SettingsScreen() {
   });
 
   const { user, signOut } = useAuth();
+  const { userProfile, isDeveloper, loading } = useUserRole();
+  
+  // Debug logging
+  console.log('🔍 Settings Debug:', {
+    user: user?.id,
+    userProfile: userProfile?.role,
+    isDeveloper: isDeveloper(),
+    loading
+  });
 
   const openModal = (type: ModalType) => {
     setModalType(type);
@@ -530,6 +542,7 @@ export default function SettingsScreen() {
               profileForm.auraColor === color && styles.selectedAuraOption
             ]}
             onPress={() => setProfileForm(prev => ({ ...prev, auraColor: color }))}
+            testID={`settings-aura-${color}`}
           >
             <View style={[styles.auraPreview, { backgroundColor: getAuraColor(color) }]} />
             <Text style={[styles.auraText, { color: getAuraColor(color) }]}>
@@ -544,7 +557,7 @@ export default function SettingsScreen() {
   const renderClassSelector = () => (
     <View style={styles.selectorSection}>
       <Text style={styles.selectorTitle}>Class Selection</Text>
-      <Text style={styles.selectorDescription}>Choose your hunter class</Text>
+      <Text style={styles.selectorDescription}>Choose your Awakened class</Text>
       <View style={styles.classContainer}>
         {(['warrior', 'mage', 'assassin', 'vagabond', 'hunter'] as ClassType[]).map(classType => {
           const classInfo = getClassInfo(classType);
@@ -556,6 +569,7 @@ export default function SettingsScreen() {
                 profileForm.class === classType && styles.selectedClassOption
               ]}
               onPress={() => setProfileForm(prev => ({ ...prev, class: classType }))}
+              testID={`settings-class-${classType}`}
             >
               <Text style={styles.classIcon}>{classInfo.icon}</Text>
               <Text style={[
@@ -587,6 +601,7 @@ export default function SettingsScreen() {
                 profileForm.focusArea === focus && styles.selectedFocusOption
               ]}
               onPress={() => handleFocusAreaSelection(focus)}
+              testID={`settings-focus-${focus}`}
             >
               <View style={styles.focusIconContainer}>
                 <Text style={styles.focusIcon}>{focusInfo.icon}</Text>
@@ -631,6 +646,7 @@ export default function SettingsScreen() {
                 supportForm.category === category && styles.selectedSupportCategory
               ]}
               onPress={() => setSupportForm(prev => ({ ...prev, category }))}
+              testID={`settings-support-category-${category}`}
             >
               <View style={styles.supportCategoryIcon}>
                 {categoryInfo.icon}
@@ -669,7 +685,11 @@ export default function SettingsScreen() {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Set Your Goal</Text>
-            <TouchableOpacity onPress={closeModal} style={styles.modalCloseButton}>
+            <TouchableOpacity 
+              onPress={closeModal} 
+              style={styles.modalCloseButton}
+              testID="settings-modal-close-button"
+            >
               <X size={24} color="#6b7280" />
             </TouchableOpacity>
           </View>
@@ -710,7 +730,7 @@ export default function SettingsScreen() {
                 <Text style={styles.goalBenefitItem}>• Generate personalized daily quests</Text>
                 <Text style={styles.goalBenefitItem}>• Track your progress effectively</Text>
                 <Text style={styles.goalBenefitItem}>• Suggest relevant challenges</Text>
-                <Text style={styles.goalBenefitItem}>• Connect you with like-minded hunters</Text>
+                <Text style={styles.goalBenefitItem}>• Connect you with like-minded Awakened</Text>
               </View>
             </>
           )}
@@ -721,12 +741,14 @@ export default function SettingsScreen() {
               onPress={closeModal}
               variant="secondary"
               style={styles.modalButton}
+              testID="settings-focus-goal-cancel-button"
             />
             <GlowingButton
               title="Set Focus & Goal"
               onPress={handleFocusGoalSubmit}
               variant="primary"
               style={styles.modalButton}
+              testID="settings-focus-goal-submit-button"
             />
           </View>
         </View>
@@ -821,12 +843,14 @@ export default function SettingsScreen() {
               onPress={closeModal}
               variant="secondary"
               style={styles.modalButton}
+              testID="settings-support-cancel-button"
             />
             <GlowingButton
               title="Send Message"
               onPress={handleSupportSubmit}
               variant="primary"
               style={styles.modalButton}
+              testID="settings-support-submit-button"
             />
           </View>
         </View>
@@ -1002,7 +1026,7 @@ export default function SettingsScreen() {
                 value={profileForm.location}
                 onChangeText={(text) => setProfileForm({...profileForm, location: text})}
               />
-              <Text style={styles.inputHint}>Optional - helps connect with nearby hunters</Text>
+              <Text style={styles.inputHint}>Optional - helps connect with nearby Awakened</Text>
             </View>
           </ScrollView>
 
@@ -1636,6 +1660,16 @@ export default function SettingsScreen() {
     }
   ];
 
+  const developerItems = [
+    {
+      title: 'Developer Panel',
+      subtitle: 'Testing tools and debug features',
+      icon: <Code size={20} color="#ff6b6b" />,
+      iconBg: '#ff6b6b20',
+      onPress: () => setDeveloperPanelVisible(true)
+    }
+  ];
+
   return (
     <LinearGradient colors={['#000000', '#1a1a2e', '#16213e']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -1660,6 +1694,7 @@ export default function SettingsScreen() {
           {renderSettingsSection('Notifications', notificationItems)}
           {renderSettingsSection('Security & Privacy', securityItems)}
           {renderSettingsSection('Support', supportItems)}
+          {(isDeveloper() || userProfile?.role === 'developer') && renderSettingsSection('Developer Tools', developerItems)}
           {/* No Account Actions section */}
 
           {/* Bottom spacing */}
@@ -1683,28 +1718,24 @@ export default function SettingsScreen() {
           onPress={async () => {
             console.log('Sign Out button pressed');
             try {
-              console.log('Calling signOut()...');
-              await signOut();
-              console.log('signOut() complete');
-            } catch (e) {
-              console.error('Error during signOut:', e);
-            }
-            try {
+              // Clear AsyncStorage first
               console.log('Clearing AsyncStorage...');
               await AsyncStorage.clear();
               console.log('AsyncStorage cleared');
-            } catch (e) {
-              console.error('Error clearing AsyncStorage:', e);
-            }
-            try {
-              console.log('Navigating to /(auth)/login...');
+              
+              // Sign out from Supabase
+              console.log('Calling signOut()...');
+              await signOut();
+              console.log('signOut() complete');
+              
+              // Navigate to login screen
+              console.log('Navigating to login...');
               router.replace('/(auth)/login');
-              if (Platform.OS === 'web') {
-                console.log('Reloading window for web...');
-                window.location.href = '/';
-              }
+              
             } catch (e) {
-              console.error('Error during navigation/reload:', e);
+              console.error('Error during signOut:', e);
+              // Even if there's an error, try to navigate to login
+              router.replace('/(auth)/login');
             }
           }}
         >
@@ -1719,6 +1750,13 @@ export default function SettingsScreen() {
         {renderNotificationsModal()}
         {renderPrivacyModal()}
         {renderSupportModal()}
+        
+        {/* Developer Panel */}
+        <DeveloperPanel
+          visible={developerPanelVisible}
+          onClose={() => setDeveloperPanelVisible(false)}
+          userProfile={userProfile}
+        />
       </SafeAreaView>
     </LinearGradient>
   );

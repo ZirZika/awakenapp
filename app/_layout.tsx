@@ -12,7 +12,8 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { router } from 'expo-router';
-import { Image, View, StyleSheet, TouchableOpacity, Platform, Linking } from 'react-native';
+import { Image, View, StyleSheet, TouchableOpacity, Linking, Text } from 'react-native';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,28 +30,39 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setIsLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setIsLoading(false);
+    let isMounted = true;
+    
+    // Get initial session with error handling
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!isMounted) return;
       
-      if (session) {
-        // User is logged in, redirect to main app
-        router.replace('/(tabs)');
-      } else {
-        // User is logged out, redirect to login
-        router.replace('/(auth)/login');
+      if (error) {
+        console.error('Error getting session:', error);
+        setIsLoading(false);
+        return;
       }
+      
+      setSession(session);
+      setIsLoading(false);
+    }).catch(error => {
+      if (!isMounted) return;
+      console.error('Error in session setup:', error);
+      setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    // Listen for auth changes with error handling
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      
+      setSession(session);
+      setIsLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []); // Remove hasInitialRedirect from dependencies
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -63,11 +75,15 @@ export default function RootLayout() {
   }
 
   if (isLoading) {
-    return null; // Keep splash screen visible while checking auth
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#ffffff', fontSize: 16 }}>Loading...</Text>
+      </View>
+    );
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -77,6 +93,9 @@ export default function RootLayout() {
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="light" backgroundColor="#000000" />
+      
+
+      
       {/* Made with Bolt logo overlay */}
       <View style={styles.boltLogoContainer}>
         <TouchableOpacity
@@ -93,7 +112,7 @@ export default function RootLayout() {
           />
         </TouchableOpacity>
       </View>
-    </>
+    </ErrorBoundary>
   );
 }
 
@@ -104,7 +123,6 @@ const styles = StyleSheet.create({
     right: 16,
     alignItems: 'flex-end',
     zIndex: 100,
-    pointerEvents: 'box-none',
   },
   boltLogo: {
     width: 120,
@@ -114,9 +132,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)',
   },
+
 });

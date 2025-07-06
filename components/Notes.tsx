@@ -173,6 +173,7 @@ export default function Notes() {
         <TouchableOpacity 
           style={styles.addButton}
           onPress={() => setShowAddNote(true)}
+          testID="notes-add-button"
         >
           <Plus size={20} color="#f59e0b" />
         </TouchableOpacity>
@@ -188,6 +189,7 @@ export default function Notes() {
             placeholderTextColor="#6b7280"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            testID="notes-search-input"
           />
         </View>
       </View>
@@ -208,6 +210,7 @@ export default function Notes() {
                 selectedCategory === category && styles.selectedCategoryChip
               ]}
               onPress={() => setSelectedCategory(category)}
+              testID={`notes-category-${category.toLowerCase()}`}
             >
               <Text style={[
                 styles.categoryChipText,
@@ -229,6 +232,7 @@ export default function Notes() {
             placeholderTextColor="#6b7280"
             value={newNoteTitle}
             onChangeText={setNewNoteTitle}
+            testID="notes-title-input"
           />
           <TextInput
             style={styles.contentInput}
@@ -238,6 +242,7 @@ export default function Notes() {
             onChangeText={setNewNoteContent}
             multiline
             numberOfLines={6}
+            testID="notes-content-input"
           />
           <View style={styles.categorySelector}>
             {categories.filter(cat => cat !== 'All').map(category => (
@@ -248,6 +253,7 @@ export default function Notes() {
                   newNoteCategory === category && styles.selectedCategoryChip
                 ]}
                 onPress={() => setNewNoteCategory(category)}
+                testID={`notes-new-category-${category.toLowerCase()}`}
               >
                 <Text style={[
                   styles.categoryChipText,
@@ -269,12 +275,14 @@ export default function Notes() {
               }}
               variant="secondary"
               style={styles.formButton}
+              testID="notes-cancel-button"
             />
             <GlowingButton
               title="Add Note"
               onPress={addNote}
               variant="primary"
               style={styles.formButton}
+              testID="notes-add-note-button"
             />
           </View>
         </View>

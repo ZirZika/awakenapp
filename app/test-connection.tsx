@@ -91,6 +91,7 @@ export default function TestConnectionScreen() {
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
+          testID="test-connection-back-button"
         >
           <ArrowLeft size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -166,6 +167,7 @@ export default function TestConnectionScreen() {
         <TouchableOpacity 
           style={styles.retestButton}
           onPress={testConnection}
+          testID="test-connection-retest-button"
         >
           <Text style={styles.retestButtonText}>Test Again</Text>
         </TouchableOpacity>
@@ -174,6 +176,7 @@ export default function TestConnectionScreen() {
           <TouchableOpacity 
             style={styles.continueButton}
             onPress={() => router.replace('/(auth)/login')}
+            testID="test-connection-continue-button"
           >
             <Text style={styles.continueButtonText}>Continue to App</Text>
           </TouchableOpacity>

@@ -3,10 +3,12 @@ import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Tex
 import { LinearGradient } from 'expo-linear-gradient';
 import { Users, Settings, Crown, Zap, Trophy, Target, Calendar, Plus, Search, UserPlus, MessageCircle, Heart, Share, Award, Flame, Star, Shield, Sword, ChevronDown, Check, Mail } from 'lucide-react-native';
 import { UserStats } from '@/types/app';
-import { getUserStats } from '@/utils/storage';
+
 import ProgressBar from '@/components/ProgressBar';
 import GlowingButton from '@/components/GlowingButton';
 import { router } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 type TabType = 'feed' | 'friends' | 'guilds' | 'leaderboard';
 type LeaderboardType = 'global' | 'friends' | 'guild';
@@ -88,15 +90,14 @@ interface LeaderboardEntry {
 }
 
 export default function SocialScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('guilds');
   const [leaderboardType, setLeaderboardType] = useState<LeaderboardType>('global');
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'add_friend' | 'join_guild' | 'create_guild' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [rankDropdownVisible, setRankDropdownVisible] = useState<string | null>(null);
-
-  // Mock unread message count
-  const [unreadMessages] = useState(3);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const [userStats, setUserStats] = useState<UserStats>({
     level: 25,
@@ -172,7 +173,7 @@ export default function SocialScreen() {
     {
       id: '1',
       name: 'Shadow Monarchs',
-      description: 'Elite guild for the strongest hunters. We conquer the impossible.',
+      description: 'Elite guild for the strongest Awakened. We conquer the impossible.',
       memberCount: 45,
       maxMembers: 50,
       level: 25,
@@ -446,10 +447,47 @@ export default function SocialScreen() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
-  const loadData = () => {
-    setUserStats(getUserStats());
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnreadCount = async () => {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('type', 'system')
+        .eq('is_read', false);
+      if (!error && typeof count === 'number') {
+        setUnreadMessages(count);
+      }
+    };
+    fetchUnreadCount();
+  }, [user]);
+
+  const loadData = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      if (!error && data) {
+        setUserStats({
+          level: data.level,
+          currentXP: data.current_xp,
+          totalXP: data.total_xp,
+          xpToNextLevel: (data.level * 1000) - (data.total_xp % 1000),
+          tasksCompleted: data.tasks_completed,
+          goalsCompleted: data.goals_completed,
+          streak: data.streak,
+          title: data.title,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    }
   };
 
   const openModal = (type: 'add_friend' | 'join_guild' | 'create_guild') => {
@@ -572,6 +610,7 @@ export default function SocialScreen() {
     <TouchableOpacity
       style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
       onPress={() => setActiveTab(tab)}
+      testID={`profile-tab-${tab}`}
     >
       {icon}
       <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
@@ -584,6 +623,7 @@ export default function SocialScreen() {
     <TouchableOpacity
       style={[styles.leaderboardTypeButton, leaderboardType === type && styles.activeLeaderboardTypeButton]}
       onPress={() => setLeaderboardType(type)}
+      testID={`profile-leaderboard-type-${type}`}
     >
       <Text style={[styles.leaderboardTypeText, leaderboardType === type && styles.activeLeaderboardTypeText]}>
         {title}
@@ -606,6 +646,7 @@ export default function SocialScreen() {
           style={styles.dropdownOverlay}
           activeOpacity={1}
           onPress={() => setRankDropdownVisible(null)}
+          testID="profile-rank-dropdown-overlay"
         >
           <View style={styles.dropdownContent}>
             <Text style={styles.dropdownTitle}>Change Rank for {member.username}</Text>
@@ -618,6 +659,7 @@ export default function SocialScreen() {
                   member.guildRank.id === rank.id && styles.selectedDropdownItem
                 ]}
                 onPress={() => handleChangeRank(member.id, rank)}
+                testID={`profile-rank-option-${rank.id}`}
               >
                 <View style={styles.dropdownItemLeft}>
                   <View style={[styles.rankColorIndicator, { backgroundColor: rank.color }]} />
@@ -668,6 +710,7 @@ export default function SocialScreen() {
             ]}
             onPress={() => canChangeRank ? setRankDropdownVisible(member.id) : null}
             disabled={!canChangeRank}
+            testID={`profile-member-rank-${member.id}`}
           >
             <Text style={[styles.memberRankText, { color: member.guildRank.color }]}>
               {member.guildRank.name}
@@ -715,14 +758,21 @@ export default function SocialScreen() {
               <TouchableOpacity 
                 style={styles.feedAction}
                 onPress={() => handleLikeFeedItem(item.id)}
+                testID={`profile-feed-like-${item.id}`}
               >
                 <Heart size={16} color={item.isLiked ? "#ef4444" : "#6b7280"} fill={item.isLiked ? "#ef4444" : "none"} />
                 <Text style={[styles.feedActionText, item.isLiked && styles.likedText]}>{item.likes}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.feedAction}>
+              <TouchableOpacity 
+                style={styles.feedAction}
+                testID={`profile-feed-comment-${item.id}`}
+              >
                 <MessageCircle size={16} color="#6b7280" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.feedAction}>
+              <TouchableOpacity 
+                style={styles.feedAction}
+                testID={`profile-feed-share-${item.id}`}
+              >
                 <Share size={16} color="#6b7280" />
               </TouchableOpacity>
             </View>
@@ -740,6 +790,7 @@ export default function SocialScreen() {
           onPress={() => openModal('add_friend')}
           variant="secondary"
           style={styles.tabAddButton}
+          testID="profile-add-friend-button"
         />
       </View>
 
@@ -763,7 +814,10 @@ export default function SocialScreen() {
             </View>
           </View>
           <View style={styles.friendActions}>
-            <TouchableOpacity style={styles.friendActionButton}>
+            <TouchableOpacity 
+              style={styles.friendActionButton}
+              testID={`profile-friend-message-${friend.id}`}
+            >
               <MessageCircle size={20} color="#6366f1" />
             </TouchableOpacity>
           </View>
@@ -1012,6 +1066,7 @@ export default function SocialScreen() {
             <TouchableOpacity 
               style={styles.inboxButton}
               onPress={() => router.push('/inbox')}
+              testID="profile-inbox-button"
             >
               <Mail size={20} color="#6366f1" />
               {unreadMessages > 0 && (
@@ -1023,6 +1078,7 @@ export default function SocialScreen() {
             <TouchableOpacity 
               style={styles.settingsButton}
               onPress={() => router.push('/settings')}
+              testID="profile-settings-button"
             >
               <Settings size={20} color="#9ca3af" />
             </TouchableOpacity>

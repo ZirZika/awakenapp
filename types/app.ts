@@ -26,6 +26,15 @@ export interface Task {
   estimatedDuration?: string;
   isUnlocked: boolean;
   unlockCondition?: string;
+  // Timer-related fields
+  hasTimer?: boolean;
+  timerDuration?: number; // in minutes
+  isStarted?: boolean;
+  startedAt?: string;
+  timeRemaining?: number; // in seconds
+  canUndo?: boolean;
+  undoExpiresAt?: string;
+  progressValue?: number; // Progress contribution toward goal completion (percentage)
 }
 
 // New interface for system quests
@@ -102,4 +111,40 @@ export interface PersonalAchievement {
   significance: 'minor' | 'major' | 'legendary';
   createdAt: string;
   source?: 'journal' | 'manual';
+}
+
+export interface CompletedQuest {
+  id: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Epic';
+  category: string;
+  questType: 'system' | 'story' | 'ai' | 'daily';
+  completedAt: string;
+  createdAt: string;
+}
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  bio: string | null;
+  location: string | null;
+  profile_picture: string | null;
+  aura_color: 'red' | 'green' | 'blue';
+  class: 'berserker' | 'shinobi' | 'sage' | 'vagabond';
+  focus_area: 'business' | 'fitness' | 'intelligence';
+  focus_goal: string | null;
+  level: number;
+  current_xp: number;
+  total_xp: number;
+  tasks_completed: number;
+  goals_completed: number;
+  streak: number;
+  title: string;
+  role: 'user' | 'developer' | 'admin';
+  developer_permissions: Record<string, any> | null;
+  admin_permissions: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
 }

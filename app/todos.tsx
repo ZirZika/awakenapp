@@ -373,6 +373,7 @@ export default function TodosScreen() {
             <TouchableOpacity 
               style={styles.backButton}
               onPress={() => router.back()}
+              testID="todos-back-button"
             >
               <X size={24} color="#ffffff" />
             </TouchableOpacity>
@@ -381,6 +382,7 @@ export default function TodosScreen() {
           <TouchableOpacity 
             style={styles.addButton}
             onPress={() => setShowAddModal(true)}
+            testID="todos-add-button"
           >
             <Plus size={20} color="#6366f1" />
           </TouchableOpacity>
@@ -416,6 +418,7 @@ export default function TodosScreen() {
               placeholderTextColor="#6b7280"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              testID="todos-search-input"
             />
           </View>
         </View>
@@ -437,6 +440,7 @@ export default function TodosScreen() {
                   selectedFilter === filter && styles.activeFilterChip
                 ]}
                 onPress={() => setSelectedFilter(filter)}
+                testID={`todos-filter-${filter}`}
               >
                 <Text style={[
                   styles.filterChipText,
@@ -458,6 +462,7 @@ export default function TodosScreen() {
                   selectedCategory === category && styles.activeCategoryChip
                 ]}
                 onPress={() => setSelectedCategory(category)}
+                testID={`todos-category-${category.toLowerCase()}`}
               >
                 <Text style={[
                   styles.filterChipText,
@@ -490,6 +495,7 @@ export default function TodosScreen() {
                   style={[styles.todoContent, todo.completed && styles.completedTodoContent]}
                   onPress={() => toggleTodo(todo.id)}
                   activeOpacity={0.8}
+                  testID={`todos-toggle-${todo.id}`}
                 >
                   <View style={styles.todoLeft}>
                     {todo.completed ? (
@@ -538,6 +544,7 @@ export default function TodosScreen() {
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => startEdit(todo)}
+                    testID={`todos-edit-${todo.id}`}
                   >
                     <Edit3 size={16} color="#6366f1" />
                   </TouchableOpacity>
@@ -547,6 +554,7 @@ export default function TodosScreen() {
                       setTodoToDelete(todo);
                       setShowDeleteConfirm(true);
                     }}
+                    testID={`todos-delete-${todo.id}`}
                   >
                     <Trash2 size={16} color="#ef4444" />
                   </TouchableOpacity>
@@ -593,6 +601,7 @@ export default function TodosScreen() {
                     setNewTodoCategory('Personal');
                     setNewTodoDueDate('');
                   }}
+                  testID="todos-modal-close-button"
                 >
                   <X size={24} color="#9ca3af" />
                 </TouchableOpacity>
@@ -608,6 +617,7 @@ export default function TodosScreen() {
                     value={newTodoTitle}
                     onChangeText={setNewTodoTitle}
                     autoFocus={true}
+                    testID="todos-modal-title-input"
                   />
                 </View>
 
@@ -621,6 +631,7 @@ export default function TodosScreen() {
                     onChangeText={setNewTodoDescription}
                     multiline={true}
                     numberOfLines={3}
+                    testID="todos-modal-description-input"
                   />
                 </View>
 
@@ -633,23 +644,27 @@ export default function TodosScreen() {
                       placeholderTextColor="#6b7280"
                       value={newTodoDueDate}
                       onChangeText={setNewTodoDueDate}
+                      testID="todos-modal-due-date-input"
                     />
                     <View style={styles.datePresets}>
                       <TouchableOpacity
                         style={styles.datePresetButton}
                         onPress={() => setNewTodoDueDate(getDatePreset('today'))}
+                        testID="todos-modal-date-preset-today"
                       >
                         <Text style={styles.datePresetText}>Today</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.datePresetButton}
                         onPress={() => setNewTodoDueDate(getDatePreset('tomorrow'))}
+                        testID="todos-modal-date-preset-tomorrow"
                       >
                         <Text style={styles.datePresetText}>Tomorrow</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.datePresetButton}
                         onPress={() => setNewTodoDueDate(getDatePreset('next-week'))}
+                        testID="todos-modal-date-preset-next-week"
                       >
                         <Text style={styles.datePresetText}>Next Week</Text>
                       </TouchableOpacity>
@@ -669,6 +684,7 @@ export default function TodosScreen() {
                           { borderColor: getPriorityColor(priority) }
                         ]}
                         onPress={() => setNewTodoPriority(priority)}
+                        testID={`todos-modal-priority-${priority}`}
                       >
                         <Text style={[
                           styles.priorityOptionText,
@@ -692,6 +708,7 @@ export default function TodosScreen() {
                           newTodoCategory === category && styles.selectedCategoryOption
                         ]}
                         onPress={() => setNewTodoCategory(category)}
+                        testID={`todos-modal-category-${category.toLowerCase()}`}
                       >
                         <Text style={[
                           styles.categoryOptionText,
@@ -720,6 +737,7 @@ export default function TodosScreen() {
                   }}
                   variant="secondary"
                   style={styles.modalButton}
+                  testID="todos-modal-cancel-button"
                 />
                 <GlowingButton
                   title={showEditModal ? 'Save Changes' : 'Add To-Do'}
@@ -727,6 +745,7 @@ export default function TodosScreen() {
                   variant="primary"
                   style={styles.modalButton}
                   disabled={!newTodoTitle.trim()}
+                  testID="todos-modal-save-button"
                 />
               </View>
             </View>
@@ -753,12 +772,14 @@ export default function TodosScreen() {
                     setShowDeleteConfirm(false);
                     setTodoToDelete(null);
                   }}
+                  testID="todos-delete-modal-cancel-button"
                 >
                   <Text style={styles.deleteModalButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.deleteModalButtonDelete}
                   onPress={confirmDelete}
+                  testID="todos-delete-modal-confirm-button"
                 >
                   <Text style={styles.deleteModalButtonText}>Delete</Text>
                 </TouchableOpacity>
