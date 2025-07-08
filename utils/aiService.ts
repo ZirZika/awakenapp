@@ -157,15 +157,33 @@ export class AIService {
     const activeGoals = context.goals.filter(g => !g.isCompleted);
     const topValues = context.coreValues.sort((a, b) => b.importance - a.importance).slice(0, 3);
     const completedTasks = context.completedTasks.slice(-5); // Recent completions
+    // Try to extract location from the most recent journal entry if available
+    const location = recentEntries.length > 0 && recentEntries[0].content ? (recentEntries[0].content.match(/\b(in|at|from|to) ([A-Z][a-zA-Z]+)/)?.[2] || '') : '';
+    const tomorrowsGoals = recentEntries.map(e => e.tomorrowGoals).filter(Boolean).join(', ');
 
-    return `Generate 3-5 personalized quests for a user based on their data:
+    return `You are an AI life coach and quest generator for a gamified personal development app called "LevelUpLife".
+
+Your job is to generate 3-5 highly specific, actionable, and personalized quests for the user based on their actual data. DO NOT generate generic or vague quests. Use the user's goals, journal entries, tomorrow's goals, and any context clues (such as location or recent life changes) to make each quest unique and relevant.
+
+Guidelines:
+- Reference the user's actual goals and make the quest directly related to them. For example, if the user's goal is to do a handstand pushup, generate a quest like "Practice handstand pushups for 10 minutes".
+- For each quest, include the exact goal title it helps achieve (goalTitle). This must match one of the user's goals.
+- For each quest, estimate how many similar quests are needed to complete the goal (estimatedQuestsToCompleteGoal). For example, if you think it will take 10 quests to complete the goal, set this to 10.
+- Use tomorrow's goals and recent journal entries to inform the quests. If the user wrote about moving to Japan, suggest something like "Explore a new park in your area".
+- Avoid generic quests like "Overcome a challenge" or "Plan tomorrow's progress". Be concrete and creative.
+- Use the user's mood, challenges, and achievements from journal entries to tailor the quests.
+- Align quests with their core values and existing goals.
+- Each quest must be unique, actionable, and motivating.
+- Assign a difficulty from 1 (very easy) to 6 (epic). Do NOT include XP; the app will map difficulty to XP.
 
 User Context:
 - Level: ${context.userLevel}
+- Location: ${location}
 - Recent Mood: ${recentEntries.map(e => e.mood).join(', ')}
 - Active Goals: ${activeGoals.map(g => `${g.title} (${g.progress}% progress)`).join(', ')}
 - Top Core Values: ${topValues.map(v => `${v.title} (importance: ${v.importance}/10)`).join(', ')}
 - Recently Completed: ${completedTasks.map(t => t.title).join(', ')}
+- Tomorrow's Goals: ${tomorrowsGoals}
 
 Recent Journal Entries:
 ${recentEntries.map(entry => `
@@ -173,9 +191,9 @@ Date: ${entry.date}
 Mood: ${entry.mood}
 Title: ${entry.title}
 Content: ${entry.content}
-Achievements: ${entry.achievements.join(', ')}
-Challenges: ${entry.challenges.join(', ')}
-Tomorrow's Goals: ${entry.tomorrowGoals.join(', ')}
+Achievements: ${Array.isArray(entry.achievements) ? entry.achievements.join(', ') : entry.achievements}
+Challenges: ${Array.isArray(entry.challenges) ? entry.challenges.join(', ') : entry.challenges}
+Tomorrow's Goals: ${entry.tomorrowGoals}
 `).join('\n')}
 
 Goal Progress Analysis:
@@ -187,29 +205,23 @@ Target Date: ${goal.targetDate || 'No deadline'}
 `).join('\n')}
 
 Please generate quests that:
-1. **Help achieve specific goals** - Create quests that directly advance goal progress
-2. **Address current challenges** - Based on journal entries, create quests that help overcome obstacles
-3. **Build on recent achievements** - Leverage momentum from completed tasks
-4. **Align with core values** - Ensure quests reflect the user's most important values
-5. **Match energy level** - Consider mood and recent activity level
-6. **Provide clear next steps** - Each quest should have actionable, specific instructions
+1. Directly help achieve specific goals (reference the actual goal in the quest)
+2. Address current challenges and tomorrow's goals
+3. Build on recent achievements
+4. Align with core values
+5. Match energy level and mood
+6. Provide clear, concrete next steps
 
-Quest Guidelines:
-- For goals with low progress (<30%): Create foundational quests that build momentum
-- For goals with medium progress (30-70%): Create breakthrough quests that push toward completion
-- For goals with high progress (>70%): Create finishing quests that help cross the finish line
-- For challenging moods: Create supportive, self-care focused quests
-- For positive moods: Create ambitious, growth-focused quests
-
-Respond with **only valid JSON** in this format:
+Respond with ONLY valid JSON in this format:
 {
   "quests": [
     {
       "title": "Quest Title",
       "description": "Detailed quest description with specific steps",
-      "difficulty": "Easy|Medium|Hard|Epic",
-      "xpReward": 50,
-      "category": "Personal|Health|Career|Relationships|Learning",
+      "goalTitle": "Exact goal title this quest helps achieve",
+      "estimatedQuestsToCompleteGoal": 10,
+      "difficulty": 1, // 1 (very easy) to 6 (epic)
+      "category": "Personal|Health|Career|Relationships|Learning|Other",
       "reasoning": "Why this quest was generated and how it helps achieve goals",
       "estimatedDuration": "15 minutes|1 hour|1 day|1 week"
     }

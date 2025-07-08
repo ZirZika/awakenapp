@@ -96,6 +96,27 @@ export default function LoginScreen() {
     }
   };
 
+  // Forgot Password Handler
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Enter Email', 'Please enter your email address above first.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) {
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert('Password Reset', 'A password reset email has been sent. Please check your inbox.');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <LinearGradient colors={['#000000', '#1a1a2e', '#16213e']} style={{ flex: 1 }}>
@@ -200,6 +221,7 @@ export default function LoginScreen() {
                 <TouchableOpacity 
                   style={styles.forgotPassword}
                   testID="login-forgot-password-button"
+                  onPress={handleForgotPassword}
                 >
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>

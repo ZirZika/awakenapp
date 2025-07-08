@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TextInput, Modal, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TextInput, Modal, Alert, TouchableOpacity, Platform, Picker } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BookOpen, Settings, Target, Award, Heart, Calendar, Smile, Meh, Frown, Star, Trophy, Flame, Brain, Swords, Mail, Sparkles, Zap } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -32,9 +32,21 @@ import TaskCard from '@/components/TaskCard';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import AIService from '@/utils/aiService';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 type TabType = 'quests' | 'journal' | 'achievements' | 'goals' | 'values';
 type ModalType = 'journal' | 'goal' | 'achievement' | 'value' | null;
+
+// Goal categories and descriptions (for future use):
+const goalCategories: { value: string; label: string }[] = [
+  { value: 'Mind Mastery', label: '🔮 Mind Mastery' }, // Level up your focus, clarity, and perception.
+  { value: 'Body Ascension', label: '⚔️ Body Ascension' }, // Push your limits. Sculpt strength, speed, and stamina.
+  { value: 'Skill Unleashing', label: '🧠 Skill Unleashing' }, // Unlock talents. Hone your craft. Forge your edge.
+  { value: 'Wisdom Expansion', label: '📚 Wisdom Expansion' }, // Absorb knowledge. Widen your vision.
+  { value: 'Inner Power Awakening', label: '🔥 Inner Power Awakening' }, // Channel energy. Build willpower. Master your spirit.
+  { value: 'World Discovery', label: '🗺️ World Discovery' }, // Venture out. Seek the unknown. Expand your reality.
+];
 
 export default function WarJournalScreen() {
   const { user } = useAuth();
@@ -42,6 +54,7 @@ export default function WarJournalScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
   const [isGeneratingQuests, setIsGeneratingQuests] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
   // Data states
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -1347,20 +1360,103 @@ export default function WarJournalScreen() {
                     onChangeText={(text) => setNewGoal({...newGoal, description: text})}
                     multiline
                   />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Category (e.g., Personal, Career, Health)"
-                    placeholderTextColor="#9CA3AF"
+                  <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Category</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
                     value={newGoal.category}
-                    onChangeText={(text) => setNewGoal({...newGoal, category: text})}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Target Date (YYYY-MM-DD)"
-                    placeholderTextColor="#9CA3AF"
+                      onChange={e => setNewGoal({ ...newGoal, category: e.target.value })}
+                      style={{
+                        background: '#23263a',
+                        color: '#fff',
+                        borderRadius: 8,
+                        border: '1px solid #374151',
+                        padding: '12px 16px',
+                        fontFamily: 'Orbitron-Regular',
+                        fontSize: 16,
+                        width: '100%',
+                        outline: 'none',
+                        marginBottom: 16,
+                        marginTop: 0,
+                        marginLeft: 0,
+                        marginRight: 0,
+                        margin: 0,
+                        boxSizing: 'border-box',
+                        display: 'block',
+                      }}
+                    >
+                      <option value="" disabled>Select Category</option>
+                      {goalCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <View style={{ backgroundColor: '#23263a', borderRadius: 8, borderWidth: 1, borderColor: '#374151', marginBottom: 16 }}>
+                      <Picker
+                        selectedValue={newGoal.category}
+                        onValueChange={itemValue => setNewGoal({ ...newGoal, category: itemValue })}
+                        style={{ color: '#fff', fontFamily: 'Orbitron-Regular', fontSize: 16 }}
+                        dropdownIconColor="#fff"
+                      >
+                        <Picker.Item label="Select Category" value="" color="#9CA3AF" />
+                        {goalCategories.map(cat => (
+                          <Picker.Item key={cat.value} label={cat.label} value={cat.value} color="#fff" />
+                        ))}
+                      </Picker>
+                    </View>
+                  )}
+                  {Platform.OS === 'web' ? (
+                    <>
+                      <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Target Date</Text>
+                      <input
+                        type="date"
                     value={newGoal.targetDate}
-                    onChangeText={(text) => setNewGoal({...newGoal, targetDate: text})}
-                  />
+                        onChange={e => setNewGoal({ ...newGoal, targetDate: e.target.value })}
+                        style={{
+                          background: '#23263a',
+                          color: '#fff',
+                          borderRadius: 8,
+                          border: '1px solid #374151',
+                          padding: '12px 16px',
+                          fontFamily: 'Orbitron-Regular',
+                          fontSize: 16,
+                          width: '100%',
+                          outline: 'none',
+                          marginBottom: 16,
+                          marginTop: 0,
+                          marginLeft: 0,
+                          marginRight: 0,
+                          margin: 0,
+                          boxSizing: 'border-box',
+                          display: 'block',
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Target Date</Text>
+                      <TouchableOpacity
+                        style={[styles.input, { justifyContent: 'center', height: 48 }]}
+                        onPress={() => setShowDatePicker(true)}
+                      >
+                        <Text style={{ color: newGoal.targetDate ? '#fff' : '#9CA3AF', fontFamily: 'Orbitron-Regular', fontSize: 16 }}>
+                          {newGoal.targetDate ? newGoal.targetDate : 'Select Date'}
+                        </Text>
+                      </TouchableOpacity>
+                      {showDatePicker && (
+                        <DateTimePicker
+                          value={newGoal.targetDate ? new Date(newGoal.targetDate) : new Date()}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                          onChange={(event: DateTimePickerEvent, selectedDate?: Date | undefined) => {
+                            setShowDatePicker(false);
+                            if (selectedDate) {
+                              setNewGoal({ ...newGoal, targetDate: selectedDate.toISOString().split('T')[0] });
+                            }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                   <TouchableOpacity style={styles.createButton} onPress={handleCreateGoal}>
                     <Text style={styles.createButtonText}>Create Goal</Text>
                   </TouchableOpacity>
@@ -1421,14 +1517,30 @@ export default function WarJournalScreen() {
                     onChangeText={(text) => setNewValue({...newValue, description: text})}
                     multiline
                   />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Importance (1-10)"
-                    placeholderTextColor="#9CA3AF"
-                    value={newValue.importance.toString()}
-                    onChangeText={(text) => setNewValue({...newValue, importance: parseInt(text) || 5})}
-                    keyboardType="numeric"
-                  />
+                  <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Importance (1-10)</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                    {[...Array(10)].map((_, i) => {
+                      const value = i + 1;
+                      const selected = newValue.importance === value;
+                      return (
+                        <TouchableOpacity
+                          key={value}
+                          style={{
+                            backgroundColor: selected ? '#6366f1' : '#23263a',
+                            borderRadius: 8,
+                            paddingVertical: 6,
+                            paddingHorizontal: 8,
+                            borderWidth: selected ? 2 : 1,
+                            borderColor: selected ? '#00ffff' : '#374151',
+                            marginHorizontal: 1,
+                          }}
+                          onPress={() => setNewValue({ ...newValue, importance: value })}
+                        >
+                          <Text style={{ color: selected ? '#fff' : '#9CA3AF', fontWeight: selected ? 'bold' : 'normal', fontFamily: 'Orbitron-Regular', fontSize: 14 }}>{value}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                   <TouchableOpacity style={styles.createButton} onPress={handleCreateValue}>
                     <Text style={styles.createButtonText}>Create Value</Text>
                   </TouchableOpacity>
@@ -1471,7 +1583,7 @@ export default function WarJournalScreen() {
               testID="journal-settings-button"
             >
               <Settings size={20} color="#9ca3af" />
-            </TouchableOpacity>
+          </TouchableOpacity>
           </View>
         </View>
 

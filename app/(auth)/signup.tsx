@@ -208,13 +208,10 @@ export default function SignUpScreen() {
         await createDefaultSystemQuests(authData.user.id);
 
         Alert.alert(
-          'Success!',
-          'Account created successfully! You can now log in.',
+          'Sign Up Successful',
+          'Your account has been created! Please check your email to verify your account, then log in.',
           [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/(auth)/login'),
-            },
+            { text: 'Go to Login', onPress: () => router.replace('/(auth)/login') }
           ]
         );
       }

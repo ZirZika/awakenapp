@@ -47,192 +47,61 @@ export default function InboxScreen({ onUpdateUnread }: { onUpdateUnread?: () =>
           created_at: profile?.created_at || new Date().toISOString(),
         });
       }
-      // Always fetch and display all system messages for the user
-      const { data: systemMessages, error } = await supabase
+      // Restore all four hardcoded update messages, newest to oldest
+      const updatesMessages: Message[] = [
+        {
+          id: 'updates-003',
+          type: 'system',
+          title: '🧠 Personalized AI & Goal System Overhaul! (2025/07/08)',
+          content: `Hey Awakened!\n\nToday's update brings a new era of personalization and progress to your journey:\n\n🤖 **AI Quest Generation Revamp:**\n• Quests are now deeply personalized—AI reads your goals, journals, and tomorrow's plans to generate unique, actionable quests just for you\n• No more generic tasks—every quest is tied to your real goals and life context\n• Quests now estimate how many steps to complete your goal, so your progress bar moves with every win\n\n📈 **Goal Progress & Tracking:**\n• Quests are now linked to specific goals\n• Progress bars update as you complete related quests\n• Completed goals remain visible for your legacy\n\n🗓️ **Cross-Platform Experience:**\n• Date and category pickers work beautifully on web, Android, and iOS\n• New goal categories with epic emojis\n\n✨ **UI/UX Upgrades:**\n• Smoother, more intuitive forms\n• Cleaner dropdowns and selectors\n• More motivating feedback and messages\n\nThis is the most intelligent and immersive Awaken experience yet. Dive in, complete your quests, and watch your progress soar!\n\n- The Awaken Team`,
+          timestamp: new Date('2025-07-08').toISOString(),
+          isRead: false,
+          sender: 'System',
+        },
+        {
+          id: 'class-update-001',
+          type: 'system',
+          title: '⚔️ Class System Update - Choose Your New Path! (2025/07/06)',
+          content: `Greetings, Awakened! \n\nWe've updated the class system with more epic and fitting classes for your journey:\n\n⚔️ **New Classes Available:**\n\n🔥 **Berserker (Red)** - Unstoppable fury and raw power\n• Perfect for those who charge headfirst into challenges\n• Red aura represents passion and determination\n\n🕷️ **Shinobi (Purple)** - Shadow mastery and stealth\n• Ideal for strategic thinkers and silent achievers\n• Purple aura represents mystery and intelligence\n\n🌿 **Sage (Green)** - Ancient wisdom and knowledge\n• Perfect for those who seek growth and learning\n• Green aura represents balance and growth\n\n👑 **Vagabond (Blue)** - Adaptable wanderer and survivor\n• Ideal for those who adapt to any situation\n• Blue aura represents calm and focus\n\n**Action Required:** Please visit your profile settings to choose your new class. Your current class will be automatically converted to the closest match, but you can change it anytime!\n\nChoose wisely, for your class will influence your journey and the quests you receive! 🎯\n\n- The Awaken Team`,
+          timestamp: new Date('2025-07-06').toISOString(),
+          isRead: false,
+          sender: 'System',
+        },
+        {
+          id: 'updates-002',
+          type: 'system',
+          title: '🚀 Major Quest System Overhaul! (2025/07/06)',
+          content: `Greetings, Awakened! \n\nWe've just completed a massive overhaul of the quest and XP system:\n\n🎯 **Quest System Improvements:**\n• Fixed XP calculation and display\n• Added real-time UI updates\n• Implemented completed quests tracking\n• Enhanced system quest completion\n\n⚡ **XP & Leveling Fixes:**\n• Proper XP progress display (e.g., 650/1000)\n• Real-time stats updates across all screens\n• Fixed quest completion rewards\n• Enhanced level calculation\n\n🔧 **Technical Improvements:**\n• Added comprehensive logging system\n• Fixed quest persistence across sessions\n• Improved error handling\n• Better database integration\n\n🎮 **User Experience:**\n• No more page reloads needed for updates\n• Immediate quest completion feedback\n• Better quest tracking and history\n• Enhanced debugging capabilities\n\nThe quest system is now fully functional and ready for your epic journey! Complete quests, earn XP, and level up like never before! 💪\n\n- The Awaken Team`,
+          timestamp: new Date('2025-07-06').toISOString(),
+          isRead: false,
+          sender: 'System',
+        },
+        {
+          id: 'updates-001',
+          type: 'system',
+          title: '🎉 App Updates Available! (2025/07/04)',
+          content: `Hey Awakened! We've got some exciting new features for you:\n\n🔥 **New Features:**\n• Enhanced Daily Quest System\n• Improved XP Tracking\n• Better Error Handling\n• Navigation Improvements\n\n⚡ **Performance Updates:**\n• Faster loading times\n• Smoother animations\n• Better stability\n\n🎯 **What's Next:**\n• Guild system coming soon\n• Friend challenges\n• Advanced analytics\n\nKeep up the great work on your journey to becoming a Monarch and the main character of your story! 💪\n\n- The Awaken Team`,
+          timestamp: new Date('2025-07-04').toISOString(),
+          isRead: false,
+          sender: 'System',
+        },
+      ];
+      // Fetch database messages as before
+      const { data: dbMessages, error } = await supabase
         .from('messages')
         .select('*')
         .eq('receiver_id', user.id)
-        .eq('type', 'system')
-        .order('created_at', { ascending: true });
-      
-      // Create hardcoded messages array
-      let allMessages: Message[] = [];
-      
-      // Add hardcoded updates message (Friday's date)
-      const updatesMessage: Message = {
-        id: 'updates-001',
-        type: 'system',
-        title: '🎉 App Updates Available! (2025/07/04)',
-        content: `Hey Awakened! We've got some exciting new features for you:
-
-🔥 **New Features:**
-• Enhanced Daily Quest System
-• Improved XP Tracking
-• Better Error Handling
-• Navigation Improvements
-
-⚡ **Performance Updates:**
-• Faster loading times
-• Smoother animations
-• Better stability
-
-🎯 **What's Next:**
-• Guild system coming soon
-• Friend challenges
-• Advanced analytics
-
-Keep up the great work on your journey to becoming a Monarch and the main character of your story! 💪
-
-- The Awaken Team`,
-        timestamp: new Date('2025-07-04').toISOString(),
-        isRead: false,
-        sender: 'System',
-      };
-      
-      // Add new hardcoded updates message for today
-      const newUpdatesMessage: Message = {
-        id: 'updates-002',
-        type: 'system',
-        title: '🚀 Major Quest System Overhaul! (2025/07/06)',
-        content: `Greetings, Awakened! 
-
-We've just completed a massive overhaul of the quest and XP system:
-
-🎯 **Quest System Improvements:**
-• Fixed XP calculation and display
-• Added real-time UI updates
-• Implemented completed quests tracking
-• Enhanced system quest completion
-
-⚡ **XP & Leveling Fixes:**
-• Proper XP progress display (e.g., 650/1000)
-• Real-time stats updates across all screens
-• Fixed quest completion rewards
-• Enhanced level calculation
-
-🔧 **Technical Improvements:**
-• Added comprehensive logging system
-• Fixed quest persistence across sessions
-• Improved error handling
-• Better database integration
-
-🎮 **User Experience:**
-• No more page reloads needed for updates
-• Immediate quest completion feedback
-• Better quest tracking and history
-• Enhanced debugging capabilities
-
-The quest system is now fully functional and ready for your epic journey! Complete quests, earn XP, and level up like never before! 💪
-
-- The Awaken Team`,
-        timestamp: new Date('2025-07-06').toISOString(),
-        isRead: false,
-        sender: 'System',
-      };
-      
-      // Add class update message for existing users
-      const classUpdateMessage: Message = {
-        id: 'class-update-001',
-        type: 'system',
-        title: '⚔️ Class System Update - Choose Your New Path! (2025/07/06)',
-        content: `Greetings, Awakened! 
-
-We've updated the class system with more epic and fitting classes for your journey:
-
-⚔️ **New Classes Available:**
-
-🔥 **Berserker (Red)** - Unstoppable fury and raw power
-• Perfect for those who charge headfirst into challenges
-• Red aura represents passion and determination
-
-🕷️ **Shinobi (Purple)** - Shadow mastery and stealth
-• Ideal for strategic thinkers and silent achievers
-• Purple aura represents mystery and intelligence
-
-🌿 **Sage (Green)** - Ancient wisdom and knowledge
-• Perfect for those who seek growth and learning
-• Green aura represents balance and growth
-
-👑 **Vagabond (Blue)** - Adaptable wanderer and survivor
-• Ideal for those who adapt to any situation
-• Blue aura represents calm and focus
-
-**Action Required:** Please visit your profile settings to choose your new class. Your current class will be automatically converted to the closest match, but you can change it anytime!
-
-Choose wisely, for your class will influence your journey and the quests you receive! 🎯
-
-- The Awaken Team`,
-        timestamp: new Date('2025-07-06').toISOString(),
-        isRead: false,
-        sender: 'System',
-      };
-      
-      // Add hardcoded daily motivation message
-      const motivationMessage: Message = {
-        id: 'motivation-001',
-        type: 'system',
-        title: '💪 Daily Motivation',
-        content: `Good morning, Awakened! 
-
-Today is a new opportunity to level up your life. Remember:
-
-🌟 Every small step counts towards your goals
-🎯 Focus on progress, not perfection
-🔥 Your consistency is your superpower
-⚡ You're stronger than you think
-
-Today's challenge: Complete at least one daily task and write a journal entry. You've got this! 
-
-Stay legendary,
-- The Awaken Team`,
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-        isRead: true,
-        sender: 'System',
-      };
-      
-      // Add hardcoded achievement unlocked message
-      const achievementMessage: Message = {
-        id: 'achievement-001',
-        type: 'system',
-        title: '🏆 Achievement Unlocked!',
-        content: `Congratulations, Awakened! 
-
-You've just unlocked a new achievement:
-
-🎯 **"First Steps"**
-Complete your first daily task
-
-This achievement shows your commitment to personal growth. Keep pushing forward and unlock more achievements on your journey!
-
-Rewards:
-• +50 XP Bonus
-• New title unlocked: "Dedicated Apprentice"
-
-Your progress is being tracked, and we're excited to see what you'll accomplish next!
-
-- The Awaken Team`,
-        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-        isRead: false,
-        sender: 'System',
-      };
-      
-      allMessages.push(classUpdateMessage); // Add class update message first (most recent)
-      allMessages.push(newUpdatesMessage);
-      allMessages.push(updatesMessage);
-      allMessages.push(motivationMessage);
-      allMessages.push(achievementMessage);
-      
-      // Add database messages if they exist
-      if (!error && systemMessages) {
-        allMessages = [...allMessages, ...systemMessages];
-      }
-      
+        .order('timestamp', { ascending: false });
+      let allMessages: Message[] = [...updatesMessages];
+      if (dbMessages) allMessages = [...allMessages, ...dbMessages];
       setMessages(allMessages);
       setLoading(false);
       if (onUpdateUnread) onUpdateUnread();
     };
     fetchMessages();
   }, [user]);
+
+  // NOTE: All system update messages should now be seeded in the database with receiver_id = null, and copied to each user inbox on signup/login.
 
   const filteredMessages = activeCategory === 'all' 
     ? messages 
@@ -345,7 +214,7 @@ Your progress is being tracked, and we're excited to see what you'll accomplish 
             )}
             <TouchableOpacity 
               style={styles.closeButton}
-              onPress={() => router.back()}
+              onPress={() => router.replace('/(tabs)')}
               testID="inbox-close-button"
             >
               <X size={24} color="#ef4444" />
