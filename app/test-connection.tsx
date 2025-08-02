@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
-import { ArrowLeft, Database, CheckCircle, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Database, CircleCheck as CheckCircle, Circle as XCircle } from 'lucide-react-native';
 
 export default function TestConnectionScreen() {
   const [connectionStatus, setConnectionStatus] = useState<'testing' | 'success' | 'error'>('testing');
