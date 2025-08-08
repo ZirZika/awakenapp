@@ -549,6 +549,88 @@ export interface Database {
           updated_at?: string;
         };
       };
+      quest_board: {
+        Row: {
+          id: string;
+          title: string;
+          description: string;
+          full_description: string;
+          xp_reward: number;
+          difficulty: 'Easy' | 'Medium' | 'Hard' | 'Epic';
+          category: string;
+          requirements: string | null;
+          time_limit: number | null;
+          max_accepts: number | null;
+          current_accepts: number;
+          is_active: boolean;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description: string;
+          full_description: string;
+          xp_reward: number;
+          difficulty: 'Easy' | 'Medium' | 'Hard' | 'Epic';
+          category: string;
+          requirements?: string | null;
+          time_limit?: number | null;
+          max_accepts?: number | null;
+          current_accepts?: number;
+          is_active?: boolean;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string;
+          full_description?: string;
+          xp_reward?: number;
+          difficulty?: 'Easy' | 'Medium' | 'Hard' | 'Epic';
+          category?: string;
+          requirements?: string | null;
+          time_limit?: number | null;
+          max_accepts?: number | null;
+          current_accepts?: number;
+          is_active?: boolean;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      quest_board_accepts: {
+        Row: {
+          id: string;
+          quest_id: string;
+          user_id: string;
+          status: 'accepted' | 'completed' | 'abandoned';
+          accepted_at: string;
+          completed_at: string | null;
+          abandoned_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          quest_id: string;
+          user_id: string;
+          status?: 'accepted' | 'completed' | 'abandoned';
+          accepted_at?: string;
+          completed_at?: string | null;
+          abandoned_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          quest_id?: string;
+          user_id?: string;
+          status?: 'accepted' | 'completed' | 'abandoned';
+          accepted_at?: string;
+          completed_at?: string | null;
+          abandoned_at?: string | null;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

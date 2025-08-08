@@ -12,12 +12,16 @@ interface SectionHeaderProps {
 const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, action }) => {
   const { t } = useTranslation();
   return (
-    <View style={styles.sectionHeader}>
+    <View style={styles.sectionHeaderImproved}>
       <View style={styles.sectionTitleContainer}>
         {icon}
         <Text style={styles.sectionTitle}>{t(title)}</Text>
       </View>
-      {action}
+      {action && (
+        <View style={{ marginLeft: 16 }}>
+          {action}
+        </View>
+      )}
     </View>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, Modal, TextInput, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, Modal, TextInput, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Settings, Clock, Plus, CircleCheck as CheckCircle2, Circle, Zap, Target, Flame, Trophy, Sword, Crown, Mail, Sparkles, Trash2, RotateCcw } from 'lucide-react-native';
 import { router, useRouter, usePathname } from 'expo-router';
@@ -457,6 +457,7 @@ export default function HubScreen() {
   const { width: screenWidth } = Dimensions.get('window');
   const isTablet = screenWidth < 1024 && screenWidth >= 600;
   const isMobile = screenWidth < 600;
+  const isDesktop = screenWidth >= 1024;
 
   // Responsive widget grid layout
   const gridStyle = [
@@ -557,9 +558,16 @@ export default function HubScreen() {
           </View>
 
           {/* Widgets Container */}
-          <View style={styles.widgetsContainer}>
+          <View style={[
+            styles.widgetsContainer,
+            isDesktop && styles.widgetsContainerDesktop,
+            isTablet && styles.widgetsContainerTablet
+          ]}>
             {/* Daily Quest Widget */}
-            <View style={styles.widgetCard}>
+            <View style={[
+              styles.widgetCard,
+              isDesktop && styles.dailyQuestWidgetDesktop
+            ]}>
               <LinearGradient
                 colors={['#1f2937', '#374151']}
                 style={styles.questCardGradient}
@@ -584,7 +592,10 @@ export default function HubScreen() {
             </View>
 
             {/* Daily Tasks Widget */}
-            <View style={styles.widgetCard}>
+            <View style={[
+              styles.widgetCard,
+              isDesktop && styles.dailyTasksWidgetDesktop
+            ]}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Daily Tasks</Text>
                 <View style={styles.taskProgress}>
@@ -635,7 +646,10 @@ export default function HubScreen() {
             </View>
 
             {/* Personal To-Dos Widget */}
-            <View style={styles.widgetCard}>
+            <View style={[
+              styles.widgetCard,
+              isDesktop && styles.personalTodosWidgetDesktop
+            ]}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>To Do</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -680,10 +694,107 @@ export default function HubScreen() {
               </View>
             </View>
 
-            {/* Desktop/Tablet Only Widgets */}
-            {!isMobile && (
+            {/* Current Stats Widget - Desktop positioning */}
+            <View style={[
+              styles.widgetCard,
+              isDesktop && styles.currentStatsWidgetDesktop,
+              isMobile && { display: 'none' }
+            ]}>
+              <Text style={styles.sectionTitle}>Current Stats</Text>
+              
+              <View style={styles.statsGrid}>
+                <View style={styles.statCard}>
+                  <Target size={24} color="#10b981" />
+                  <Text style={styles.statValue}>{userStats.tasksCompleted}</Text>
+                  <Text style={styles.statLabel}>Quests Completed</Text>
+                </View>
+                
+                <View style={styles.statCard}>
+                  <Flame size={24} color="#f59e0b" />
+                  <Text style={styles.statValue}>{userStats.streak}</Text>
+                  <Text style={styles.statLabel}>Current Streak</Text>
+                </View>
+                
+                <View style={styles.statCard}>
+                  <Zap size={24} color="#8b5cf6" />
+                  <Text style={styles.statValue}>2.5x</Text>
+                  <Text style={styles.statLabel}>XP Multiplier</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Recent Completed Quests Widget - Desktop positioning */}
+            <View style={[
+              styles.widgetCard,
+              isDesktop && styles.recentQuestsWidgetDesktop,
+              isMobile && { display: 'none' }
+            ]}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recent Completed Quests</Text>
+                <TouchableOpacity 
+                  onPress={() => router.push('/journal')}
+                  testID="view-all-quests-button"
+                >
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {completedQuests.length > 0 ? (
+                <View style={styles.questsContainer}>
+                  {completedQuests.map(quest => (
+                    <View key={quest.id} style={styles.completedQuestItem}>
+                      <Text style={styles.completedQuestTitle}>{quest.title}</Text>
+                      <View style={styles.questReward}>
+                        <Zap size={14} color="#FBBF24" />
+                        <Text style={styles.questXP}>+{quest.xpReward}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyQuestsContainer}>
+                  <Text style={styles.emptyQuestsText}>
+                    No completed quests yet. Complete quests in the War Journal to see them here!
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.goToJournalButton}
+                    onPress={() => router.push('/journal')}
+                  >
+                    <Text style={styles.goToJournalButtonText}>Go to War Journal</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Timer Widget - Desktop only */}
+            {isDesktop && (
+              <View style={[styles.widgetCard, styles.timerWidgetDesktop]}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Quick Timer</Text>
+                  <TouchableOpacity 
+                    onPress={() => router.push('/tools')}
+                    testID="open-tools-button"
+                  >
+                    <Text style={styles.viewAllText}>Open Tools</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.timerPreview}>
+                  <Clock size={32} color="#6366f1" />
+                  <Text style={styles.timerPreviewText}>25:00</Text>
+                  <TouchableOpacity 
+                    style={styles.quickTimerButton}
+                    onPress={() => router.push('/tools')}
+                  >
+                    <Text style={styles.quickTimerButtonText}>Start Pomodoro</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Legacy tablet/mobile widgets - keep for backward compatibility */}
+            {isTablet && !isDesktop && (
               <>
-                {/* Current Stats Widget */}
+                {/* Current Stats Widget - Tablet */}
                 <View style={styles.widgetCard}>
                   <Text style={styles.sectionTitle}>Current Stats</Text>
                   
@@ -708,7 +819,7 @@ export default function HubScreen() {
                   </View>
                 </View>
 
-                {/* Recent Completed Quests Widget */}
+                {/* Recent Completed Quests Widget - Tablet */}
                 <View style={styles.widgetCard}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Recent Completed Quests</Text>
@@ -1315,5 +1426,64 @@ const styles = StyleSheet.create({
   widgetsContainer: {
     paddingHorizontal: 20,
     gap: 16,
+  },
+  widgetsContainerDesktop: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gridTemplateRows: 'auto auto auto',
+    gridGap: 24,
+    gridTemplateAreas: `
+      "daily-quest daily-tasks personal-todos"
+      "current-stats recent-quests timer"
+      ". . ."
+    `,
+    paddingHorizontal: 40,
+  },
+  widgetsContainerTablet: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gridGap: 20,
+    paddingHorizontal: 30,
+  },
+  // Desktop widget positioning
+  dailyQuestWidgetDesktop: {
+    gridArea: 'daily-quest',
+  },
+  dailyTasksWidgetDesktop: {
+    gridArea: 'daily-tasks',
+  },
+  personalTodosWidgetDesktop: {
+    gridArea: 'personal-todos',
+  },
+  currentStatsWidgetDesktop: {
+    gridArea: 'current-stats',
+  },
+  recentQuestsWidgetDesktop: {
+    gridArea: 'recent-quests',
+  },
+  timerWidgetDesktop: {
+    gridArea: 'timer',
+  },
+  // Timer widget styles
+  timerPreview: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 12,
+  },
+  timerPreviewText: {
+    fontFamily: 'Orbitron-Bold',
+    fontSize: 24,
+    color: '#6366f1',
+  },
+  quickTimerButton: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  quickTimerButtonText: {
+    fontFamily: 'Orbitron-Bold',
+    fontSize: 12,
+    color: '#ffffff',
   },
 });
