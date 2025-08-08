@@ -4,12 +4,19 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { Database } from '@/types/database';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-// Add error handling for missing environment variables
-if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
-  console.warn('Supabase environment variables are not set. Please check your .env file.');
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey || 
+    supabaseUrl === 'https://your-project.supabase.co' || 
+    supabaseAnonKey === 'your-anon-key' ||
+    supabaseAnonKey === 'your_anon_key_here') {
+  throw new Error(
+    'Supabase environment variables are not properly configured. ' +
+    'Please update your .env file with your actual Supabase URL and Anon Key. ' +
+    'You can find these in your Supabase project settings under "API".'
+  );
 }
 
 // Platform-aware storage implementation

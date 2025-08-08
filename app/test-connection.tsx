@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
-import { ArrowLeft, Database, CheckCircle, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Database, CircleCheck as CheckCircle, Circle as XCircle } from 'lucide-react-native';
 
 export default function TestConnectionScreen() {
   const [connectionStatus, setConnectionStatus] = useState<'testing' | 'success' | 'error'>('testing');
@@ -25,6 +25,7 @@ export default function TestConnectionScreen() {
   const testConnection = async () => {
     try {
       setConnectionStatus('testing');
+      setErrorMessage('');
       const results = { connection: false, tables: false, auth: false };
 
       // Test 1: Basic connection
@@ -32,9 +33,17 @@ export default function TestConnectionScreen() {
         const { data, error } = await supabase.from('profiles').select('count').limit(1);
         if (!error) {
           results.connection = true;
+        } else {
+          console.log('Connection test error:', error);
         }
       } catch (error) {
         console.log('Connection test failed:', error);
+        if (error instanceof Error && error.message.includes('environment variables')) {
+          setErrorMessage('Supabase credentials not configured. Please update your .env file with your actual Supabase URL and Anon Key.');
+          setTestResults(results);
+          setConnectionStatus('error');
+          return;
+        }
       }
 
       // Test 2: Check if tables exist
@@ -69,7 +78,17 @@ export default function TestConnectionScreen() {
 
     } catch (error) {
       setConnectionStatus('error');
-      setErrorMessage(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMsg.includes('environment variables') || errorMsg.includes('Failed to fetch')) {
+        setErrorMessage(
+          'Supabase connection failed. Please check that:\n' +
+          '1. Your .env file exists in the project root\n' +
+          '2. EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are set with actual values\n' +
+          '3. Your Supabase project is running and accessible'
+        );
+      } else {
+        setErrorMessage(`Connection failed: ${errorMsg}`);
+      }
     }
   };
 
