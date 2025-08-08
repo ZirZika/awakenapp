@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, Modal, TextInput, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Settings, Clock, Plus, CircleCheck as CheckCircle2, Circle, Zap, Target, Flame, Trophy, Sword, Crown, Mail, Sparkles, Trash2, RotateCcw } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { router, useRouter, usePathname } from 'expo-router';
 import { Task, UserStats, CompletedQuest } from '@/types/app';
 
 import { getUserDailyTasks, createDailyTask, updateDailyTask, updateUserStats, getUserTasks, getUserCompletedQuests } from '@/utils/supabaseStorage';
@@ -13,6 +13,7 @@ import GlowingButton from '@/components/GlowingButton';
 import { scale, scaleFont } from '../../utils/config';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import HeaderActions from '@/components/HeaderActions';
 
 // Add DailyTask type
 interface DailyTask {
@@ -453,10 +454,25 @@ export default function HubScreen() {
     return baseStyle;
   };
 
+  const { width: screenWidth } = Dimensions.get('window');
+  const isTablet = screenWidth < 1024 && screenWidth >= 600;
+  const isMobile = screenWidth < 600;
 
+  // Responsive widget grid layout
+  const gridStyle = [
+    styles.widgetGrid,
+    isTablet && styles.widgetGridTablet,
+    isMobile && styles.widgetGridMobile,
+  ];
+  const columnStyle = [
+    styles.widgetColumn,
+    isTablet && styles.widgetColumnTablet,
+    isMobile && styles.widgetColumnMobile,
+  ];
 
+  // Desktop grid layout: 2 columns below profile card
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <LinearGradient colors={['#000000', '#0a0a1a', '#1a1a2e']} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
@@ -466,29 +482,11 @@ export default function HubScreen() {
               <Text style={styles.headerTitle}>The Hub</Text>
             </View>
             <View style={styles.headerRight}>
-                              <TouchableOpacity 
-                  style={styles.inboxButton}
-                  onPress={() => router.push('/inbox')}
-                  testID="inbox-button"
-                >
-                <Mail size={20} color="#6366f1" />
-                {unreadMessages > 0 && (
-                  <View style={styles.inboxBadge}>
-                    <Text style={styles.inboxBadgeText}>{unreadMessages}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-                              <TouchableOpacity 
-                  style={styles.settingsButton}
-                  onPress={() => router.push('/settings')}
-                  testID="settings-button"
-                >
-                <Settings size={20} color="#9ca3af" />
-              </TouchableOpacity>
+              <HeaderActions unreadMessages={unreadMessages} />
             </View>
           </View>
 
-          {/* Hunter Profile Card - Sleek Version */}
+          {/* Hunter Profile Card - stays at top */}
           <View style={styles.profileSection}>
             <LinearGradient
               colors={['#1a1a2e', '#2d3748', '#1a1a2e']}
@@ -558,49 +556,43 @@ export default function HubScreen() {
             </LinearGradient>
           </View>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            {/* Daily Quest */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Daily Quest</Text>
-                <View style={styles.timerContainer}>
-                  <Clock size={16} color="#f59e0b" />
-                  <Text style={styles.timerText}>{timeLeft}</Text>
-                </View>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.dailyQuestCard}
-                onPress={() => router.push('/journal')}
-                testID="daily-quest-card"
+          {/* Widgets Container */}
+          <View style={styles.widgetsContainer}>
+            {/* Daily Quest Widget */}
+            <View style={styles.widgetCard}>
+              <LinearGradient
+                colors={['#1f2937', '#374151']}
+                style={styles.questCardGradient}
               >
-                <LinearGradient
-                  colors={['#1f2937', '#374151']}
-                  style={styles.questCardGradient}
-                >
-                  <View style={styles.questContent}>
-                    <Text style={styles.questTitle}>Master Your Day</Text>
-                    <Text style={styles.questDescription}>
-                      Complete all daily tasks to unlock bonus XP and maintain your streak
+                <View style={styles.questContent}>
+                  <Text style={styles.questTitle}>Master Your Day</Text>
+                  <Text style={styles.questDescription}>
+                    Complete all daily tasks to unlock bonus XP and maintain your streak
+                  </Text>
+                  <View style={styles.questProgress}>
+                    <Text style={styles.questProgressText}>
+                      Progress: {completedDailyTasks}/{totalDailyTasks}
                     </Text>
-                    <View style={styles.questProgress}>
-                      <Text style={styles.questProgressText}>
-                        Progress: {completedDailyTasks}/{totalDailyTasks}
-                      </Text>
-                      <ProgressBar 
-                        progress={totalDailyTasks === 0 ? 0 : completedDailyTasks / totalDailyTasks} 
-                        height={6}
-                        glowColor="#10b981"
-                      />
-                    </View>
+                    <ProgressBar 
+                      progress={totalDailyTasks === 0 ? 0 : completedDailyTasks / totalDailyTasks} 
+                      height={6}
+                      glowColor="#10b981"
+                    />
                   </View>
-                </LinearGradient>
-              </TouchableOpacity>
+                </View>
+              </LinearGradient>
             </View>
 
-            {/* Daily Tasks */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Daily Tasks</Text>
+            {/* Daily Tasks Widget */}
+            <View style={styles.widgetCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Daily Tasks</Text>
+                <View style={styles.taskProgress}>
+                  <Text style={styles.taskProgressText}>
+                    {completedDailyTasks}/{totalDailyTasks}
+                  </Text>
+                </View>
+              </View>
               <View style={styles.tasksContainer}>
                 {dailyTasks.map(task => (
                   <View key={task.id} style={[styles.taskItem, task.completed && styles.completedTask]}> 
@@ -642,8 +634,8 @@ export default function HubScreen() {
               </View>
             </View>
 
-            {/* Personal To-Dos */}
-            <View style={styles.section}>
+            {/* Personal To-Dos Widget */}
+            <View style={styles.widgetCard}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>To Do</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -688,78 +680,77 @@ export default function HubScreen() {
               </View>
             </View>
 
-            {/* Current Stats Panel */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Current Stats</Text>
-              
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.statsScrollView}
-                contentContainerStyle={styles.statsContainer}
-              >
-                <View style={styles.statCard}>
-                  <Target size={24} color="#10b981" />
-                  <Text style={styles.statValue}>{userStats.tasksCompleted}</Text>
-                  <Text style={styles.statLabel}>Quests Completed</Text>
-                </View>
-                
-                <View style={styles.statCard}>
-                  <Flame size={24} color="#f59e0b" />
-                  <Text style={styles.statValue}>{userStats.streak}</Text>
-                  <Text style={styles.statLabel}>Current Streak</Text>
-                </View>
-                
-                <View style={styles.statCard}>
-                  <Zap size={24} color="#8b5cf6" />
-                  <Text style={styles.statValue}>2.5x</Text>
-                  <Text style={styles.statLabel}>XP Multiplier</Text>
-                </View>
-              </ScrollView>
-            </View>
-
-            {/* Recent Completed Quests */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recent Completed Quests</Text>
-                                  <TouchableOpacity 
-                    onPress={() => router.push('/journal')}
-                    testID="view-all-quests-button"
-                  >
-                    <Text style={styles.viewAllText}>View All</Text>
-                  </TouchableOpacity>
-              </View>
-              
-              {completedQuests.length > 0 ? (
-                <View style={styles.questsContainer}>
-                  {completedQuests.map(quest => (
-                    <View key={quest.id} style={styles.completedQuestItem}>
-                      <Text style={styles.completedQuestTitle}>{quest.title}</Text>
-                      <View style={styles.questReward}>
-                        <Zap size={14} color="#FBBF24" />
-                        <Text style={styles.questXP}>+{quest.xpReward}</Text>
-                      </View>
+            {/* Desktop/Tablet Only Widgets */}
+            {!isMobile && (
+              <>
+                {/* Current Stats Widget */}
+                <View style={styles.widgetCard}>
+                  <Text style={styles.sectionTitle}>Current Stats</Text>
+                  
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statCard}>
+                      <Target size={24} color="#10b981" />
+                      <Text style={styles.statValue}>{userStats.tasksCompleted}</Text>
+                      <Text style={styles.statLabel}>Quests Completed</Text>
                     </View>
-                  ))}
+                    
+                    <View style={styles.statCard}>
+                      <Flame size={24} color="#f59e0b" />
+                      <Text style={styles.statValue}>{userStats.streak}</Text>
+                      <Text style={styles.statLabel}>Current Streak</Text>
+                    </View>
+                    
+                    <View style={styles.statCard}>
+                      <Zap size={24} color="#8b5cf6" />
+                      <Text style={styles.statValue}>2.5x</Text>
+                      <Text style={styles.statLabel}>XP Multiplier</Text>
+                    </View>
+                  </View>
                 </View>
-              ) : (
-                <View style={styles.emptyQuestsContainer}>
-                  <Text style={styles.emptyQuestsText}>
-                    No completed quests yet. Complete quests in the War Journal to see them here!
-                  </Text>
-                  <TouchableOpacity 
-                    style={styles.goToJournalButton}
-                    onPress={() => router.push('/journal')}
-                  >
-                    <Text style={styles.goToJournalButtonText}>Go to War Journal</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
 
-            {/* Bottom spacing for tab bar */}
-            <View style={styles.bottomSpacing} />
-          </ScrollView>
+                {/* Recent Completed Quests Widget */}
+                <View style={styles.widgetCard}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Recent Completed Quests</Text>
+                    <TouchableOpacity 
+                      onPress={() => router.push('/journal')}
+                      testID="view-all-quests-button"
+                    >
+                      <Text style={styles.viewAllText}>View All</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {completedQuests.length > 0 ? (
+                    <View style={styles.questsContainer}>
+                      {completedQuests.map(quest => (
+                        <View key={quest.id} style={styles.completedQuestItem}>
+                          <Text style={styles.completedQuestTitle}>{quest.title}</Text>
+                          <View style={styles.questReward}>
+                            <Zap size={14} color="#FBBF24" />
+                            <Text style={styles.questXP}>+{quest.xpReward}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyQuestsContainer}>
+                      <Text style={styles.emptyQuestsText}>
+                        No completed quests yet. Complete quests in the War Journal to see them here!
+                      </Text>
+                      <TouchableOpacity 
+                        style={styles.goToJournalButton}
+                        onPress={() => router.push('/journal')}
+                      >
+                        <Text style={styles.goToJournalButtonText}>Go to War Journal</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Modals and overlays remain unchanged */}
         </SafeAreaView>
       </LinearGradient>
       <Modal
@@ -832,7 +823,7 @@ export default function HubScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -1175,18 +1166,24 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textDecorationLine: 'line-through',
   },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
   statsScrollView: {
     marginHorizontal: -20,
   },
   statsContainer: {
     paddingHorizontal: 20,
     gap: 12,
+    flexDirection: 'row',
   },
   statCard: {
     backgroundColor: '#1f2937',
     borderRadius: 12,
-    padding: scale(16),
-    width: 120,
+    padding: 16,
+    flex: 1,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#374151',
@@ -1262,5 +1259,61 @@ const styles = StyleSheet.create({
     fontFamily: 'Orbitron-Regular',
     fontSize: 12,
     color: '#ffffff',
+  },
+  widgetGrid: {
+    flexDirection: 'row',
+    gap: 32,
+    marginHorizontal: 20,
+    marginTop: 8,
+  },
+  widgetGridTablet: { 
+    flexDirection: 'column', 
+    gap: 20,
+    marginHorizontal: 20,
+  },
+  widgetGridMobile: { 
+    flexDirection: 'column', 
+    gap: 16, 
+    marginHorizontal: 16,
+    marginTop: 8,
+  },
+  widgetColumn: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: 32,
+  },
+  widgetColumnTablet: { 
+    width: '100%', 
+    gap: 20,
+  },
+  widgetColumnMobile: { 
+    width: '100%', 
+    gap: 16,
+  },
+  widgetCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 0,
+    shadowColor: '#00ffff',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  taskProgress: {
+    backgroundColor: '#374151',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  taskProgressText: {
+    fontFamily: 'Orbitron-Regular',
+    fontSize: 12,
+    color: '#10b981',
+  },
+  widgetsContainer: {
+    paddingHorizontal: 20,
+    gap: 16,
   },
 });

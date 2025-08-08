@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import DeveloperPanel from '@/components/DeveloperPanel';
+import { useTranslation } from 'react-i18next';
 
 type ModalType = 'email' | 'password' | 'notifications' | 'profile' | 'focusGoal' | 'privacy' | 'support' | null;
 type AuraColor = 'red' | 'green' | 'blue';
@@ -17,6 +18,7 @@ type FocusArea = 'business' | 'fitness' | 'intelligence';
 type SupportCategory = 'bug' | 'suggestion' | 'question' | 'feedback' | 'account' | 'other';
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -505,7 +507,7 @@ export default function SettingsScreen() {
         name: 'General Question', 
         icon: <MessageSquare size={20} color="#6366f1" />, 
         description: 'Ask a question about the app',
-        placeholder: 'What would you like to know about LevelUpLife?'
+        placeholder: 'What would you like to know about Awaken?'
       };
       case 'feedback': return { 
         name: 'General Feedback', 
@@ -1677,7 +1679,7 @@ export default function SettingsScreen() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <SettingsIcon size={24} color="#6366f1" />
-            <Text style={styles.headerTitle}>Settings</Text>
+            <Text style={styles.headerTitle}>{t('Settings')}</Text>
           </View>
           <TouchableOpacity 
             style={styles.closeButton}

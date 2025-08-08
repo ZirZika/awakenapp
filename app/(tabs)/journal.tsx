@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TextInput, Modal, Alert, TouchableOpacity, Platform, Picker } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TextInput, Modal, Alert, TouchableOpacity, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BookOpen, Settings, Target, Award, Heart, Calendar, Smile, Meh, Frown, Star, Trophy, Flame, Brain, Swords, Mail, Sparkles, Zap } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -24,7 +24,9 @@ import {
   getUserAIGeneratedQuests,
   createAIGeneratedQuest,
   updateAIGeneratedQuest,
-  updateUserStats
+  updateUserStats,
+  deleteGoal,
+  deleteCoreValue
 } from '@/utils/supabaseStorage';
 import { generateTasksForGoal } from '@/utils/gameLogic';
 import GlowingButton from '@/components/GlowingButton';
@@ -34,68 +36,74 @@ import { supabase } from '@/lib/supabase';
 import AIService from '@/utils/aiService';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
+import styles from './JournalStyles';
+import JournalEntryCard from '../../components/JournalEntryCard';
+import GoalCard from '../../components/GoalCard';
+import AchievementCard from '../../components/AchievementCard';
+import QuestCard from '../../components/QuestCard';
+import ValueCard from '../../components/ValueCard';
+import JournalModal from '../../components/JournalModal';
+import TabBar from '../../components/TabBar';
+import CompletedQuestCard from '../../components/CompletedQuestCard';
+import WidgetCard from '../../components/WidgetCard';
+import useJournalData from '../../hooks/useJournalData';
+import { getMoodIcon, getSignificanceColor, getTabIcon, getTimeRemaining } from '../../utils/journalHelpers';
+import QuestsTab from '../../components/QuestsTab';
+import JournalTab from '../../components/JournalTab';
+import AchievementsTab from '../../components/AchievementsTab';
+import GoalsTab from '../../components/GoalsTab';
+import ValuesTab from '../../components/ValuesTab';
+import { useJournalModal } from '../../hooks/useJournalModal';
+import HeaderActions from '@/components/HeaderActions';
+import { useTranslation } from 'react-i18next';
 
-type TabType = 'quests' | 'journal' | 'achievements' | 'goals' | 'values';
-type ModalType = 'journal' | 'goal' | 'achievement' | 'value' | null;
+export type TabType = 'quests' | 'journal' | 'achievements' | 'goals' | 'values';
+export type ModalType = 'journal' | 'goal' | 'achievement' | 'value' | null;
 
 // Goal categories and descriptions (for future use):
 const goalCategories: { value: string; label: string }[] = [
-  { value: 'Mind Mastery', label: '🔮 Mind Mastery' }, // Level up your focus, clarity, and perception.
+  { value: 'Mind Mastery', label: '🧠 Mind Mastery' }, // Level up your focus, clarity, and perception.
   { value: 'Body Ascension', label: '⚔️ Body Ascension' }, // Push your limits. Sculpt strength, speed, and stamina.
-  { value: 'Skill Unleashing', label: '🧠 Skill Unleashing' }, // Unlock talents. Hone your craft. Forge your edge.
   { value: 'Wisdom Expansion', label: '📚 Wisdom Expansion' }, // Absorb knowledge. Widen your vision.
-  { value: 'Inner Power Awakening', label: '🔥 Inner Power Awakening' }, // Channel energy. Build willpower. Master your spirit.
+  { value: 'Business & Wealth', label: '💰 Business & Wealth' }, // Build your finances.
   { value: 'World Discovery', label: '🗺️ World Discovery' }, // Venture out. Seek the unknown. Expand your reality.
 ];
 
 export default function WarJournalScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('quests');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState<ModalType>(null);
   const [isGeneratingQuests, setIsGeneratingQuests] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   
   // Data states
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [coreValues, setCoreValues] = useState<CoreValue[]>([]);
-  const [personalAchievements, setPersonalAchievements] = useState<PersonalAchievement[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [systemQuests, setSystemQuests] = useState<SystemQuest[]>([]);
-  const [unreadMessages, setUnreadMessages] = useState(0);
+  const {
+    goals, setGoals,
+    journalEntries, setJournalEntries,
+    coreValues, setCoreValues,
+    personalAchievements, setPersonalAchievements,
+    tasks, setTasks,
+    systemQuests, setSystemQuests,
+    unreadMessages,
+    loadData,
+  } = useJournalData(user);
 
-  // Form states
-  const [newGoal, setNewGoal] = useState({
-    title: '',
-    description: '',
-    category: '',
-    targetDate: '',
-  });
-
-  const [newJournalEntry, setNewJournalEntry] = useState({
-    title: '',
-    content: '',
-    mood: 'neutral' as JournalEntry['mood'],
-    achievements: '',
-    challenges: '',
-    gratitude: '',
-    tomorrowGoals: '',
-  });
-
-  const [newValue, setNewValue] = useState({
-    title: '',
-    description: '',
-    importance: 5,
-  });
-
-  const [newAchievement, setNewAchievement] = useState({
-    title: '',
-    description: '',
-    category: '',
-    date: new Date().toISOString().split('T')[0],
-    significance: 'minor' as PersonalAchievement['significance'],
-  });
+  // Modal and form state (from custom hook)
+  const {
+    modalVisible,
+    modalType,
+    openModal,
+    closeModal,
+    newGoal,
+    setNewGoal,
+    newJournalEntry,
+    setNewJournalEntry,
+    newValue,
+    setNewValue,
+    newAchievement,
+    setNewAchievement,
+  } = useJournalModal();
 
   useEffect(() => {
     if (user) {
@@ -113,7 +121,7 @@ export default function WarJournalScreen() {
         .eq('type', 'system')
         .eq('is_read', false);
       if (!error && typeof count === 'number') {
-        setUnreadMessages(count);
+        // setUnreadMessages(count); // This line was removed as per the edit hint
       }
     };
     fetchUnreadCount();
@@ -225,65 +233,6 @@ export default function WarJournalScreen() {
     } catch (error) {
       console.error('❌ Error checking daily journal completion:', error);
     }
-  };
-
-  const loadData = async () => {
-    if (!user) return;
-    try {
-      console.log('🔄 Loading journal data for user:', user.id);
-      
-      // Load all data from database
-      const [userGoals, userJournalEntries, userCoreValues, userPersonalAchievements, userTasks, userSystemQuests] = await Promise.all([
-        getUserGoals(user.id),
-        getUserJournalEntries(user.id),
-        getUserCoreValues(user.id),
-        getUserPersonalAchievements(user.id),
-        getUserTasks(user.id),
-        getUserSystemQuests(user.id)
-      ]);
-      
-      console.log('📊 Loaded data:', {
-        goals: userGoals.length,
-        journalEntries: userJournalEntries.length,
-        coreValues: userCoreValues.length,
-        achievements: userPersonalAchievements.length,
-        tasks: userTasks.length,
-        systemQuests: userSystemQuests.length
-      });
-      
-      console.log('🎯 System Quests:', userSystemQuests.map(q => ({ title: q.title, isCompleted: q.isCompleted })));
-      console.log('📋 Tasks:', userTasks.map(t => ({ title: t.title, isCompleted: t.isCompleted, questType: t.questType })));
-      
-      // Generate story quests for existing goals that don't have them
-      await generateStoryQuestsForExistingGoals(userGoals, userTasks);
-      
-      // Check if daily journal entry is already completed for today
-      await checkDailyJournalCompletion(userJournalEntries, userSystemQuests);
-      
-      setGoals(userGoals);
-      setJournalEntries(userJournalEntries);
-      setCoreValues(userCoreValues);
-      setPersonalAchievements(userPersonalAchievements);
-      setTasks(userTasks);
-      setSystemQuests(userSystemQuests);
-    } catch (error) {
-      console.error('❌ Error loading data:', error);
-    }
-  };
-
-  const openModal = (type: ModalType) => {
-    setModalType(type);
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setModalType(null);
-    // Reset forms
-    setNewGoal({ title: '', description: '', category: '', targetDate: '' });
-    setNewJournalEntry({ title: '', content: '', mood: 'neutral', achievements: '', challenges: '', gratitude: '', tomorrowGoals: '' });
-    setNewValue({ title: '', description: '', importance: 5 });
-    setNewAchievement({ title: '', description: '', category: '', date: new Date().toISOString().split('T')[0], significance: 'minor' });
   };
 
   const handleCompleteTask = async (taskId: string) => {
@@ -542,10 +491,10 @@ export default function WarJournalScreen() {
       title: newJournalEntry.title,
       content: newJournalEntry.content,
       mood: newJournalEntry.mood,
-      achievements: newJournalEntry.achievements.split('\n').filter(a => a.trim()),
-      challenges: newJournalEntry.challenges.split('\n').filter(c => c.trim()),
-      gratitude: newJournalEntry.gratitude.split('\n').filter(g => g.trim()),
-      tomorrowGoals: newJournalEntry.tomorrowGoals.split('\n').filter(t => t.trim()),
+      achievements: newJournalEntry.achievements,
+      challenges: newJournalEntry.challenges,
+      gratitude: newJournalEntry.gratitude,
+      tomorrowGoals: newJournalEntry.tomorrowGoals,
       createdAt: new Date().toISOString(),
     };
 
@@ -759,798 +708,14 @@ export default function WarJournalScreen() {
     }
   };
 
-  const getMoodIcon = (mood: JournalEntry['mood']) => {
-    switch (mood) {
-      case 'excellent': return <Smile size={20} color="#10B981" />;
-      case 'good': return <Smile size={20} color="#3B82F6" />;
-      case 'neutral': return <Meh size={20} color="#6B7280" />;
-      case 'challenging': return <Frown size={20} color="#F59E0B" />;
-      case 'difficult': return <Frown size={20} color="#EF4444" />;
-      default: return <Meh size={20} color="#6B7280" />;
+  const handleDeleteValue = async (id: string) => {
+    try {
+      await deleteCoreValue(id);
+      setCoreValues(prev => prev.filter(v => v.id !== id));
+      Alert.alert('Deleted', 'Value deleted successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete value');
     }
-  };
-
-  const getSignificanceColor = (significance: PersonalAchievement['significance']) => {
-    switch (significance) {
-      case 'minor': return '#6B7280';
-      case 'major': return '#3B82F6';
-      case 'legendary': return '#F59E0B';
-      default: return '#6B7280';
-    }
-  };
-
-  // Add getTabIcon function for tab icons
-  const getTabIcon = (tab: TabType, isActive: boolean) => {
-    const color = isActive ? '#ffffff' : '#9ca3af';
-    const size = 20;
-    switch (tab) {
-      case 'quests':
-        return <Sparkles size={size} color={color} />;
-      case 'journal':
-        return <BookOpen size={size} color={color} />;
-      case 'achievements':
-        return <Trophy size={size} color={color} />;
-      case 'goals':
-        return <Target size={size} color={color} />;
-      case 'values':
-        return <Heart size={size} color={color} />;
-      default:
-        return null;
-    }
-  };
-
-  // Update renderTabButton to use getTabIcon
-  const renderTabButton = (tab: TabType, title: string) => (
-    <TouchableOpacity
-      style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
-      onPress={() => setActiveTab(tab)}
-      testID={`journal-tab-${tab}`}
-    >
-      {getTabIcon(tab, activeTab === tab)}
-      <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const renderQuestsTab = () => {
-    // Only show AI quests created within the last 24 hours
-    const now = new Date();
-    const aiQuests = tasks.filter(task => task.questType === 'ai-generated' && !task.isCompleted && ((now.getTime() - new Date(task.createdAt).getTime()) / (1000 * 60 * 60) < 24));
-    const systemQuestsList = systemQuests.filter(quest => !quest.isCompleted);
-    const goalBasedQuests = tasks.filter(task => task.questType === 'goal-based' && !task.isCompleted);
-    const completedQuests = tasks.filter(task => task.isCompleted);
-
-    // Helper to get time remaining for AI quests
-    const getTimeRemaining = (task: Task) => {
-      if (task.questType === 'ai-generated') {
-        const createdAt = new Date(task.createdAt);
-        const now = new Date();
-        const hoursDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-        const hoursRemaining = Math.max(0, 24 - hoursDiff);
-        if (hoursRemaining < 1) {
-          const minutesRemaining = Math.max(0, (24 * 60) - ((now.getTime() - createdAt.getTime()) / (1000 * 60)));
-          return `${Math.floor(minutesRemaining)}m remaining`;
-        }
-        return `${Math.floor(hoursRemaining)}h remaining`;
-      }
-      return null;
-    };
-
-    return (
-      <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-        {/* System Quests Section */}
-        <View style={styles.questSection}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Settings size={24} color="#10B981" />
-              <Text style={styles.sectionTitle}>System Quests</Text>
-            </View>
-          </View>
-          <Text style={styles.sectionDescription}>
-            Daily and regular quests to help you maintain good habits and track progress
-          </Text>
-          {systemQuestsList.length > 0 ? (
-            systemQuestsList.map(quest => (
-              <View key={quest.id} style={styles.questCard}>
-                <View style={styles.questHeader}>
-                  <Text style={styles.questTitle}>{quest.title}</Text>
-                  <View style={styles.questBadge}>
-                    <Settings size={12} color="#10B981" />
-                    <Text style={styles.questBadgeText}>System</Text>
-                  </View>
-                </View>
-                <Text style={styles.questDescription}>{quest.description}</Text>
-                <View style={styles.questFooter}>
-                  <Text style={styles.questDifficulty}>{quest.difficulty}</Text>
-                  <Text style={styles.questXP}>+{quest.xpReward} XP</Text>
-                  <Text style={styles.questFrequency}>{quest.frequency}</Text>
-                </View>
-                <Text style={styles.systemQuestInstruction}>
-                  {quest.title === 'Daily Journal Entry' && 'Complete this by writing a journal entry.'}
-                  {quest.title === 'Weekly Achievement' && 'Complete this by recording a weekly achievement.'}
-                  {quest.title === 'Weekly Goal Setting' && 'Complete this by setting a weekly goal.'}
-                  {quest.title === 'Core Values Reflection' && 'Complete this by updating your core values.'}
-                  {!['Daily Journal Entry','Weekly Achievement','Weekly Goal Setting','Core Values Reflection'].includes(quest.title) && 'Complete this by using the app features.'}
-                </Text>
-                {quest.title === 'Daily Journal Entry' && (
-                  <TouchableOpacity 
-                    style={styles.goButton}
-                    onPress={() => setActiveTab('journal')}
-                    testID="journal-daily-journal-go-button"
-                  >
-                    <Text style={styles.goButtonText}>Go</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyQuestState}>
-              <Settings size={48} color="#374151" />
-              <Text style={styles.emptyQuestTitle}>No System Quests Available</Text>
-              <Text style={styles.emptyQuestText}>
-                System quests help you build essential habits. Check back regularly for new challenges.
-            </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Story Quests Section */}
-        <View style={styles.questSection}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-                <Target size={24} color="#3B82F6" />
-                <Text style={styles.sectionTitle}>Story Quests</Text>
-            </View>
-          </View>
-          <Text style={styles.sectionDescription}>
-              Quests generated to help you achieve your specific goals and advance your story
-          </Text>
-          {goalBasedQuests.length > 0 ? (
-            goalBasedQuests.map(task => (
-              <View key={task.id} style={styles.questCard}>
-                <View style={styles.questHeader}>
-                  <Text style={styles.questTitle}>{task.title}</Text>
-                  <View style={styles.questBadge}>
-                    <Target size={12} color="#3B82F6" />
-                    <Text style={styles.questBadgeText}>Goal</Text>
-                  </View>
-                </View>
-                <Text style={styles.questDescription}>{task.description}</Text>
-                <View style={styles.questFooter}>
-                  <Text style={styles.questDifficulty}>{task.difficulty}</Text>
-                  <Text style={styles.questXP}>+{task.xpReward} XP</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.completeButton}
-                  onPress={() => handleCompleteTask(task.id)}
-                  testID={`journal-complete-goal-quest-${task.id}`}
-                >
-                  <Text style={styles.completeButtonText}>Complete Quest</Text>
-                </TouchableOpacity>
-              </View>
-            ))
-        ) : (
-          <View style={styles.emptyQuestState}>
-            <Target size={48} color="#374151" />
-            <Text style={styles.emptyQuestTitle}>No Story Quests Available</Text>
-            <Text style={styles.emptyQuestText}>
-              Create goals to unlock personalized story quests that guide your journey.
-            </Text>
-            <GlowingButton
-              title="Create Goal"
-              onPress={() => openModal('goal')}
-              style={{ marginTop: 16 }}
-                testID="journal-create-goal-button"
-            />
-        </View>
-        )}
-        </View>
-
-        {/* AI Quests Section (Bonus Quests) */}
-          <View style={styles.questSection}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-              <Sparkles size={24} color="#8B5CF6" />
-              <Text style={styles.sectionTitle}>Bonus Quests</Text>
-              </View>
-            </View>
-            <Text style={styles.sectionDescription}>
-            Personalized bonus quests generated by AI based on your journal entries and goals. Available for 24 hours only!
-          </Text>
-          {aiQuests.length > 0 ? (
-            aiQuests.map(task => (
-              <View key={task.id} style={styles.questCard}>
-                <View style={styles.questHeader}>
-                  <Text style={styles.questTitle}>{task.title}</Text>
-                  <View style={styles.questBadge}>
-                    <Sparkles size={12} color="#8B5CF6" />
-                    <Text style={styles.questBadgeText}>AI</Text>
-                  </View>
-                </View>
-                <Text style={styles.questDescription}>{task.description}</Text>
-                {task.reasoning && (
-                  <Text style={styles.questReasoning}>💡 {task.reasoning}</Text>
-                )}
-                <View style={styles.questFooter}>
-                  <Text style={styles.questDifficulty}>{task.difficulty}</Text>
-                  <Text style={styles.questXP}>+{task.xpReward} XP</Text>
-                  {task.estimatedDuration && (
-                    <Text style={styles.questDuration}>⏱ {task.estimatedDuration}</Text>
-                  )}
-                  {/* Timer for AI quest expiry */}
-                  <Text style={styles.questTimer}>{getTimeRemaining(task)}</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.completeButton}
-                  onPress={() => handleCompleteTask(task.id)}
-                  testID={`journal-complete-ai-quest-${task.id}`}
-                >
-                  <Text style={styles.completeButtonText}>Complete Quest</Text>
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyQuestState}>
-              <Sparkles size={48} color="#374151" />
-              <Text style={styles.emptyQuestTitle}>No AI Quests Available</Text>
-              <Text style={styles.emptyQuestText}>
-                Complete your current quests and add journal entries to unlock personalized AI-generated bonus quests!
-              </Text>
-              <GlowingButton
-                title={isGeneratingQuests ? 'Generating...' : 'Generate New Quests'}
-                onPress={handleGenerateAIQuests}
-                disabled={isGeneratingQuests}
-                style={{ marginTop: 16 }}
-                testID="journal-generate-ai-quests-button"
-              />
-          </View>
-        )}
-        </View>
-
-        {/* Completed Quests Section */}
-        {completedQuests.length > 0 && (
-          <View style={styles.questSection}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <Trophy size={24} color="#9CA3AF" />
-                <Text style={[styles.sectionTitle, styles.completedSectionTitle]}>Completed Quests</Text>
-              </View>
-            </View>
-            <Text style={[styles.sectionDescription, styles.completedSectionDescription]}>
-              Your completed quests and achievements
-            </Text>
-            
-            {completedQuests.map(task => (
-              <View key={task.id} style={[styles.questCard, styles.completedQuestCard]}>
-                <View style={styles.questHeader}>
-                  <Text style={[styles.questTitle, styles.completedQuestTitle]}>{task.title}</Text>
-                  <View style={[styles.questBadge, styles.completedQuestBadge]}>
-                    {task.questType === 'ai-generated' ? (
-                      <Sparkles size={12} color="#9CA3AF" />
-                    ) : task.questType === 'goal-based' ? (
-                      <Target size={12} color="#9CA3AF" />
-                    ) : (
-                      <Settings size={12} color="#9CA3AF" />
-                    )}
-                    <Text style={[styles.questBadgeText, styles.completedQuestBadgeText]}>
-                      {task.questType === 'ai-generated' ? 'AI' : task.questType === 'goal-based' ? 'Goal' : 'System'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.questDescription, styles.completedQuestDescription]}>{task.description}</Text>
-                {task.reasoning && (
-                  <Text style={[styles.questReasoning, styles.completedQuestReasoning]}>💡 {task.reasoning}</Text>
-                )}
-                <View style={styles.questFooter}>
-                  <Text style={[styles.questDifficulty, styles.completedQuestDifficulty]}>{task.difficulty}</Text>
-                  <Text style={[styles.questXP, styles.completedQuestXP]}>+{task.xpReward} XP</Text>
-                  {task.estimatedDuration && (
-                    <Text style={[styles.questDuration, styles.completedQuestDuration]}>⏱ {task.estimatedDuration}</Text>
-                  )}
-                </View>
-                <View style={styles.completedBadge}>
-                  <Text style={styles.completedBadgeText}>✓ Completed</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    );
-  };
-
-  const renderJournalTab = () => (
-    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Journal Entries</Text>
-        <GlowingButton
-          title="New Entry"
-          onPress={() => openModal('journal')}
-          testID="journal-new-entry-button"
-        />
-      </View>
-      
-      {journalEntries.length > 0 ? (
-        journalEntries.map(entry => (
-          <View key={entry.id} style={styles.journalCard}>
-            <View style={styles.journalHeader}>
-              <Text style={styles.journalDate}>{entry.date}</Text>
-              {getMoodIcon(entry.mood)}
-            </View>
-            <Text style={styles.journalTitle}>{entry.title}</Text>
-            <Text style={styles.journalContent}>{entry.content}</Text>
-            
-            {entry.achievements.length > 0 && (
-              <View style={styles.journalSection}>
-                <Text style={styles.journalSectionTitle}>🏆 Achievements</Text>
-                {entry.achievements.map((achievement, index) => (
-                  <Text key={index} style={styles.journalListItem}>• {achievement}</Text>
-                ))}
-              </View>
-            )}
-            
-            {entry.challenges.length > 0 && (
-              <View style={styles.journalSection}>
-                <Text style={styles.journalSectionTitle}>⚔️ Challenges</Text>
-                {entry.challenges.map((challenge, index) => (
-                  <Text key={index} style={styles.journalListItem}>• {challenge}</Text>
-                ))}
-              </View>
-            )}
-            
-            {entry.gratitude.length > 0 && (
-              <View style={styles.journalSection}>
-                <Text style={styles.journalSectionTitle}>🙏 Gratitude</Text>
-                {entry.gratitude.map((item, index) => (
-                  <Text key={index} style={styles.journalListItem}>• {item}</Text>
-                ))}
-              </View>
-            )}
-            
-            {entry.tomorrowGoals.length > 0 && (
-              <View style={styles.journalSection}>
-                <Text style={styles.journalSectionTitle}>🎯 Tomorrow's Goals</Text>
-                {entry.tomorrowGoals.map((goal, index) => (
-                  <Text key={index} style={styles.journalListItem}>• {goal}</Text>
-                ))}
-              </View>
-            )}
-          </View>
-        ))
-      ) : (
-        <Text style={styles.emptyStateText}>
-          No journal entries yet. Start your journey by creating your first entry!
-        </Text>
-      )}
-    </ScrollView>
-  );
-
-  const renderAchievementsTab = () => {
-    // Generate achievements from journal entries
-    const generatedAchievements = journalEntries.flatMap(entry => 
-      entry.achievements.map((achievement, index) => ({
-        id: `${entry.id}-achievement-${index}`,
-        title: achievement,
-        description: `Achievement from ${entry.date}: ${achievement}`,
-        category: 'Personal',
-        date: entry.date,
-        significance: 'minor' as PersonalAchievement['significance'],
-        createdAt: entry.createdAt,
-        source: 'journal'
-      }))
-    );
-
-    // Combine generated achievements with manually created ones
-    const allAchievements = [...personalAchievements, ...generatedAchievements];
-
-    return (
-      <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Personal Achievements</Text>
-          <View style={styles.achievementStats}>
-            <Text style={styles.achievementStatsText}>
-              {allAchievements.length} Total Achievements
-            </Text>
-          </View>
-        </View>
-        
-        <Text style={styles.sectionDescription}>
-          Your achievements are automatically generated from your journal entries and personal wins
-        </Text>
-        
-        {allAchievements.length > 0 ? (
-          allAchievements.map(achievement => (
-            <View key={achievement.id} style={styles.achievementCard}>
-              <View style={styles.achievementHeader}>
-                <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                <View style={styles.achievementBadge}>
-                  {achievement.source === 'journal' ? (
-                    <BookOpen size={12} color="#3B82F6" />
-                  ) : (
-                    <Award size={12} color="#F59E0B" />
-                  )}
-                  <Text style={styles.achievementBadgeText}>
-                    {achievement.source === 'journal' ? 'Journal' : 'Manual'}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.achievementDescription}>{achievement.description}</Text>
-              <View style={styles.achievementFooter}>
-                <Text style={styles.achievementCategory}>{achievement.category}</Text>
-                <Text style={styles.achievementDate}>{achievement.date}</Text>
-              </View>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.emptyStateText}>
-            No achievements yet. Create journal entries to automatically generate achievements from your wins!
-          </Text>
-        )}
-      </ScrollView>
-    );
-  };
-
-  const renderGoalsTab = () => (
-    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Goals</Text>
-        <GlowingButton
-          title="New Goal"
-          onPress={() => openModal('goal')}
-        />
-      </View>
-      
-      {goals.length > 0 ? (
-        goals.map(goal => (
-          <View key={goal.id} style={styles.goalCard}>
-            <View style={styles.goalHeader}>
-              <Text style={styles.goalTitle}>{goal.title}</Text>
-              <View style={[styles.goalStatus, goal.isCompleted && styles.goalCompleted]}>
-                <Text style={styles.goalStatusText}>
-                  {goal.isCompleted ? 'Completed' : 'In Progress'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.goalDescription}>{goal.description}</Text>
-            <View style={styles.goalProgress}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${goal.progress}%` }]} />
-              </View>
-              <Text style={styles.progressText}>{goal.progress}%</Text>
-            </View>
-            <View style={styles.goalFooter}>
-              <Text style={styles.goalCategory}>{goal.category}</Text>
-              {goal.targetDate && <Text style={styles.goalDate}>Due: {goal.targetDate}</Text>}
-            </View>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.emptyStateText}>
-          No goals set yet. Start setting goals to track your progress!
-        </Text>
-      )}
-    </ScrollView>
-  );
-
-  const renderValuesTab = () => (
-    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Core Values</Text>
-        <GlowingButton
-          title="New Value"
-          onPress={() => openModal('value')}
-        />
-      </View>
-      
-      {coreValues.length > 0 ? (
-        coreValues.map(value => (
-          <View key={value.id} style={styles.valueCard}>
-            <View style={styles.valueHeader}>
-              <Text style={styles.valueTitle}>{value.title}</Text>
-              <View style={styles.importanceBadge}>
-                <Text style={styles.importanceText}>Importance: {value.importance}/10</Text>
-              </View>
-            </View>
-            <Text style={styles.valueDescription}>{value.description}</Text>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.emptyStateText}>
-          No core values defined yet. Define what's important to you!
-        </Text>
-      )}
-    </ScrollView>
-  );
-
-  const renderModal = () => {
-    if (!modalType) return null;
-
-    return (
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {modalType === 'journal' && 'New Journal Entry'}
-                {modalType === 'goal' && 'New Goal'}
-                {modalType === 'achievement' && 'New Achievement'}
-                {modalType === 'value' && 'New Core Value'}
-              </Text>
-              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {modalType === 'journal' && (
-                <View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Entry Title"
-                    placeholderTextColor="#9CA3AF"
-                    value={newJournalEntry.title}
-                    onChangeText={(text) => setNewJournalEntry({...newJournalEntry, title: text})}
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="What happened today? How are you feeling?"
-                    placeholderTextColor="#9CA3AF"
-                    value={newJournalEntry.content}
-                    onChangeText={(text) => setNewJournalEntry({...newJournalEntry, content: text})}
-                    multiline
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Achievements (one per line)"
-                    placeholderTextColor="#9CA3AF"
-                    value={newJournalEntry.achievements}
-                    onChangeText={(text) => setNewJournalEntry({...newJournalEntry, achievements: text})}
-                    multiline
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Challenges (one per line)"
-                    placeholderTextColor="#9CA3AF"
-                    value={newJournalEntry.challenges}
-                    onChangeText={(text) => setNewJournalEntry({...newJournalEntry, challenges: text})}
-                    multiline
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Gratitude (one per line)"
-                    placeholderTextColor="#9CA3AF"
-                    value={newJournalEntry.gratitude}
-                    onChangeText={(text) => setNewJournalEntry({...newJournalEntry, gratitude: text})}
-                    multiline
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Tomorrow's Goals (one per line)"
-                    placeholderTextColor="#9CA3AF"
-                    value={newJournalEntry.tomorrowGoals}
-                    onChangeText={(text) => setNewJournalEntry({...newJournalEntry, tomorrowGoals: text})}
-                    multiline
-                  />
-                  <TouchableOpacity style={styles.createButton} onPress={handleCreateJournalEntry}>
-                    <Text style={styles.createButtonText}>Create Entry</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {modalType === 'goal' && (
-                <View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Goal Title"
-                    placeholderTextColor="#9CA3AF"
-                    value={newGoal.title}
-                    onChangeText={(text) => setNewGoal({...newGoal, title: text})}
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Goal Description"
-                    placeholderTextColor="#9CA3AF"
-                    value={newGoal.description}
-                    onChangeText={(text) => setNewGoal({...newGoal, description: text})}
-                    multiline
-                  />
-                  <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Category</Text>
-                  {Platform.OS === 'web' ? (
-                    <select
-                    value={newGoal.category}
-                      onChange={e => setNewGoal({ ...newGoal, category: e.target.value })}
-                      style={{
-                        background: '#23263a',
-                        color: '#fff',
-                        borderRadius: 8,
-                        border: '1px solid #374151',
-                        padding: '12px 16px',
-                        fontFamily: 'Orbitron-Regular',
-                        fontSize: 16,
-                        width: '100%',
-                        outline: 'none',
-                        marginBottom: 16,
-                        marginTop: 0,
-                        marginLeft: 0,
-                        marginRight: 0,
-                        margin: 0,
-                        boxSizing: 'border-box',
-                        display: 'block',
-                      }}
-                    >
-                      <option value="" disabled>Select Category</option>
-                      {goalCategories.map(cat => (
-                        <option key={cat.value} value={cat.value}>{cat.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <View style={{ backgroundColor: '#23263a', borderRadius: 8, borderWidth: 1, borderColor: '#374151', marginBottom: 16 }}>
-                      <Picker
-                        selectedValue={newGoal.category}
-                        onValueChange={itemValue => setNewGoal({ ...newGoal, category: itemValue })}
-                        style={{ color: '#fff', fontFamily: 'Orbitron-Regular', fontSize: 16 }}
-                        dropdownIconColor="#fff"
-                      >
-                        <Picker.Item label="Select Category" value="" color="#9CA3AF" />
-                        {goalCategories.map(cat => (
-                          <Picker.Item key={cat.value} label={cat.label} value={cat.value} color="#fff" />
-                        ))}
-                      </Picker>
-                    </View>
-                  )}
-                  {Platform.OS === 'web' ? (
-                    <>
-                      <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Target Date</Text>
-                      <input
-                        type="date"
-                    value={newGoal.targetDate}
-                        onChange={e => setNewGoal({ ...newGoal, targetDate: e.target.value })}
-                        style={{
-                          background: '#23263a',
-                          color: '#fff',
-                          borderRadius: 8,
-                          border: '1px solid #374151',
-                          padding: '12px 16px',
-                          fontFamily: 'Orbitron-Regular',
-                          fontSize: 16,
-                          width: '100%',
-                          outline: 'none',
-                          marginBottom: 16,
-                          marginTop: 0,
-                          marginLeft: 0,
-                          marginRight: 0,
-                          margin: 0,
-                          boxSizing: 'border-box',
-                          display: 'block',
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Target Date</Text>
-                      <TouchableOpacity
-                        style={[styles.input, { justifyContent: 'center', height: 48 }]}
-                        onPress={() => setShowDatePicker(true)}
-                      >
-                        <Text style={{ color: newGoal.targetDate ? '#fff' : '#9CA3AF', fontFamily: 'Orbitron-Regular', fontSize: 16 }}>
-                          {newGoal.targetDate ? newGoal.targetDate : 'Select Date'}
-                        </Text>
-                      </TouchableOpacity>
-                      {showDatePicker && (
-                        <DateTimePicker
-                          value={newGoal.targetDate ? new Date(newGoal.targetDate) : new Date()}
-                          mode="date"
-                          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                          onChange={(event: DateTimePickerEvent, selectedDate?: Date | undefined) => {
-                            setShowDatePicker(false);
-                            if (selectedDate) {
-                              setNewGoal({ ...newGoal, targetDate: selectedDate.toISOString().split('T')[0] });
-                            }
-                          }}
-                        />
-                      )}
-                    </>
-                  )}
-                  <TouchableOpacity style={styles.createButton} onPress={handleCreateGoal}>
-                    <Text style={styles.createButtonText}>Create Goal</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {modalType === 'achievement' && (
-                <View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Achievement Title"
-                    placeholderTextColor="#9CA3AF"
-                    value={newAchievement.title}
-                    onChangeText={(text) => setNewAchievement({...newAchievement, title: text})}
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Achievement Description"
-                    placeholderTextColor="#9CA3AF"
-                    value={newAchievement.description}
-                    onChangeText={(text) => setNewAchievement({...newAchievement, description: text})}
-                    multiline
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Category"
-                    placeholderTextColor="#9CA3AF"
-                    value={newAchievement.category}
-                    onChangeText={(text) => setNewAchievement({...newAchievement, category: text})}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Date (YYYY-MM-DD)"
-                    placeholderTextColor="#9CA3AF"
-                    value={newAchievement.date}
-                    onChangeText={(text) => setNewAchievement({...newAchievement, date: text})}
-                  />
-                  <TouchableOpacity style={styles.createButton} onPress={handleCreateAchievement}>
-                    <Text style={styles.createButtonText}>Create Achievement</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {modalType === 'value' && (
-                <View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Value Title"
-                    placeholderTextColor="#9CA3AF"
-                    value={newValue.title}
-                    onChangeText={(text) => setNewValue({...newValue, title: text})}
-                  />
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Value Description"
-                    placeholderTextColor="#9CA3AF"
-                    value={newValue.description}
-                    onChangeText={(text) => setNewValue({...newValue, description: text})}
-                    multiline
-                  />
-                  <Text style={{ color: '#9CA3AF', marginBottom: 8, marginTop: 8, fontFamily: 'Orbitron-Regular', fontSize: 14 }}>Importance (1-10)</Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-                    {[...Array(10)].map((_, i) => {
-                      const value = i + 1;
-                      const selected = newValue.importance === value;
-                      return (
-                        <TouchableOpacity
-                          key={value}
-                          style={{
-                            backgroundColor: selected ? '#6366f1' : '#23263a',
-                            borderRadius: 8,
-                            paddingVertical: 6,
-                            paddingHorizontal: 8,
-                            borderWidth: selected ? 2 : 1,
-                            borderColor: selected ? '#00ffff' : '#374151',
-                            marginHorizontal: 1,
-                          }}
-                          onPress={() => setNewValue({ ...newValue, importance: value })}
-                        >
-                          <Text style={{ color: selected ? '#fff' : '#9CA3AF', fontWeight: selected ? 'bold' : 'normal', fontFamily: 'Orbitron-Regular', fontSize: 14 }}>{value}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  <TouchableOpacity style={styles.createButton} onPress={handleCreateValue}>
-                    <Text style={styles.createButtonText}>Create Value</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
   };
 
   return (
@@ -1561,673 +726,95 @@ export default function WarJournalScreen() {
       >
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.title}>War Journal</Text>
-            <Text style={styles.subtitle}>Track your journey to greatness</Text>
+            <Text style={styles.title}>{t('War Journal')}</Text>
+            <Text style={styles.subtitle}>{t('Track your journey to greatness')}</Text>
           </View>
           <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.inboxButton}
-            onPress={() => router.push('/inbox')}
-              testID="journal-inbox-button"
-          >
-              <Mail size={20} color="#6366f1" />
-            {unreadMessages > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadMessages}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingsButton}
-              onPress={() => router.push('/settings')}
-              testID="journal-settings-button"
-            >
-              <Settings size={20} color="#9ca3af" />
-          </TouchableOpacity>
+            <HeaderActions unreadMessages={unreadMessages} />
           </View>
         </View>
 
-        <View style={styles.tabContainer}>
-          {renderTabButton('quests', 'Quests')}
-          {renderTabButton('journal', 'Journal')}
-          {renderTabButton('achievements', 'Wins')}
-          {renderTabButton('goals', 'Goals')}
-          {renderTabButton('values', 'Values')}
-        </View>
+        <TabBar
+          tabs={[
+            { key: 'quests', title: t('Quests') },
+            { key: 'journal', title: t('Journal') },
+            { key: 'achievements', title: t('Wins') },
+            { key: 'goals', title: t('Goals') },
+            { key: 'values', title: t('Values') },
+          ]}
+          activeTab={activeTab}
+          onTabPress={key => setActiveTab(key as TabType)}
+        />
 
-        {activeTab === 'quests' && renderQuestsTab()}
-        {activeTab === 'journal' && renderJournalTab()}
-        {activeTab === 'achievements' && renderAchievementsTab()}
-        {activeTab === 'goals' && renderGoalsTab()}
-        {activeTab === 'values' && renderValuesTab()}
+        {activeTab === 'quests' && (
+          <QuestsTab
+            tasks={tasks}
+            systemQuests={systemQuests}
+            isGeneratingQuests={isGeneratingQuests}
+            handleCompleteTask={handleCompleteTask}
+            handleGenerateAIQuests={handleGenerateAIQuests}
+            openModal={openModal}
+            setActiveTab={setActiveTab}
+            getTimeRemaining={getTimeRemaining}
+          />
+        )}
+        {activeTab === 'journal' && (
+          <JournalTab
+            journalEntries={journalEntries}
+            openModal={openModal}
+          />
+        )}
+        {activeTab === 'achievements' && (
+          <AchievementsTab
+            journalEntries={journalEntries}
+            personalAchievements={personalAchievements}
+          />
+        )}
+        {activeTab === 'goals' && (
+          <GoalsTab
+            goals={goals}
+            openModal={openModal}
+            deleteGoal={id =>
+              new Promise<void>((resolve) => {
+                Alert.alert(
+                  'Delete Goal',
+                  'Are you sure you want to delete this goal?',
+                  [
+                    { text: 'Cancel', style: 'cancel', onPress: () => resolve() },
+                    { text: 'Delete', style: 'destructive', onPress: async () => { await deleteGoal(id); resolve(); } },
+                  ]
+                );
+              })
+            }
+            loadData={loadData}
+          />
+        )}
+        {activeTab === 'values' && (
+          <ValuesTab
+            coreValues={coreValues}
+            openModal={openModal}
+            onDelete={handleDeleteValue}
+          />
+        )}
 
-        {renderModal()}
+        <JournalModal
+          visible={modalVisible}
+          type={modalType}
+          onClose={closeModal}
+          newJournalEntry={newJournalEntry}
+          setNewJournalEntry={setNewJournalEntry}
+          onCreateJournalEntry={handleCreateJournalEntry}
+          newGoal={newGoal}
+          setNewGoal={setNewGoal}
+          onCreateGoal={handleCreateGoal}
+          newValue={newValue}
+          setNewValue={setNewValue}
+          onCreateValue={handleCreateValue}
+          newAchievement={newAchievement}
+          setNewAchievement={setNewAchievement}
+          onCreateAchievement={handleCreateAchievement}
+        />
       </LinearGradient>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  title: {
-    fontFamily: 'Orbitron-Black',
-    fontSize: 24,
-    color: '#ffffff',
-  },
-  subtitle: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#9ca3af',
-  },
-  inboxButton: {
-    position: 'relative',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#1f2937',
-    borderWidth: 1,
-    borderColor: '#6366f1',
-  },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#ef4444',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    minWidth: 16,
-    alignItems: 'center',
-  },
-  badgeText: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 9,
-    color: '#ffffff',
-  },
-  settingsButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#1f2937',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: '#374151',
-  },
-  activeTabButton: {
-    backgroundColor: '#6366f1',
-  },
-  tabButtonText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 4,
-  },
-  activeTabButtonText: {
-    color: '#ffffff',
-  },
-  tabContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 18,
-    color: '#ffffff',
-    marginLeft: 8,
-  },
-  sectionDescription: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#9ca3af',
-    marginBottom: 16,
-  },
-  generateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#8B5CF6',
-  },
-  generateButtonText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#ffffff',
-    marginLeft: 4,
-  },
-  questSection: {
-    marginBottom: 24,
-  },
-  questCard: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  questHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  questTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 16,
-    color: '#ffffff',
-    flex: 1,
-  },
-  questBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#374151',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  questBadgeText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 10,
-    color: '#ffffff',
-    marginLeft: 2,
-  },
-  questDescription: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#d1d5db',
-    marginBottom: 8,
-  },
-  questReasoning: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#8B5CF6',
-    fontStyle: 'italic',
-    marginBottom: 12,
-  },
-  questFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  questDifficulty: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  questXP: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#fbbf24',
-  },
-  questDuration: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  questFrequency: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  completeButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-  },
-  completeButtonText: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 14,
-    color: '#ffffff',
-  },
-  goButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    backgroundColor: '#6366f1',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginTop: 8,
-  },
-  goButtonText: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 12,
-    color: '#ffffff',
-  },
-  journalCard: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  journalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  journalDate: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  journalTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 16,
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  journalContent: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#d1d5db',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  journalSection: {
-    marginBottom: 8,
-  },
-  journalSectionTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 12,
-    color: '#fbbf24',
-    marginBottom: 4,
-  },
-  journalListItem: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#d1d5db',
-    marginLeft: 8,
-    marginBottom: 2,
-  },
-  achievementCard: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  achievementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  achievementTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 16,
-    color: '#ffffff',
-    flex: 1,
-  },
-  achievementBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#374151',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  achievementBadgeText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 10,
-    color: '#ffffff',
-    marginLeft: 2,
-  },
-  achievementDescription: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#d1d5db',
-    marginBottom: 8,
-  },
-  achievementFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  achievementCategory: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  achievementDate: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  goalCard: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  goalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  goalTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 16,
-    color: '#ffffff',
-    flex: 1,
-    marginRight: 12,
-  },
-  goalStatus: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: '#374151',
-  },
-  goalCompleted: {
-    backgroundColor: '#10B981',
-  },
-  goalStatusText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 10,
-    color: '#ffffff',
-  },
-  goalDescription: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#d1d5db',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  goalProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressBar: {
-    backgroundColor: '#374151',
-    borderRadius: 4,
-    height: 8,
-    flex: 1,
-    marginRight: 8,
-  },
-  progressFill: {
-    backgroundColor: '#6366f1',
-    borderRadius: 4,
-    height: '100%',
-  },
-  progressText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  goalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  goalCategory: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  goalDate: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  valueCard: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  valueHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  valueTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 16,
-    color: '#ffffff',
-    flex: 1,
-  },
-  importanceBadge: {
-    backgroundColor: '#374151',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  importanceText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 10,
-    color: '#fbbf24',
-  },
-  valueDescription: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#d1d5db',
-    lineHeight: 20,
-  },
-  emptyStateText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-    marginTop: 20,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 18,
-    color: '#ffffff',
-  },
-  closeButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#374151',
-  },
-  closeButtonText: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 16,
-    color: '#ffffff',
-  },
-  modalBody: {
-    maxHeight: 400,
-  },
-  input: {
-    backgroundColor: '#374151',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 14,
-    color: '#ffffff',
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  createButton: {
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#6366f1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createButtonText: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 14,
-    color: '#ffffff',
-  },
-  completedSectionTitle: {
-    color: '#9CA3AF',
-  },
-  completedSectionDescription: {
-    color: '#9CA3AF',
-  },
-  completedQuestCard: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  completedQuestTitle: {
-    color: '#ffffff',
-  },
-  completedQuestBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#374151',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  completedQuestBadgeText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 10,
-    color: '#ffffff',
-    marginLeft: 2,
-  },
-  completedQuestDescription: {
-    color: '#ffffff',
-  },
-  completedQuestReasoning: {
-    color: '#ffffff',
-  },
-  completedQuestDifficulty: {
-    color: '#ffffff',
-  },
-  completedQuestXP: {
-    color: '#ffffff',
-  },
-  completedQuestDuration: {
-    color: '#ffffff',
-  },
-  completedBadge: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completedBadgeText: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 14,
-    color: '#ffffff',
-  },
-  achievementStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 4,
-    backgroundColor: '#374151',
-  },
-  achievementStatsText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#ffffff',
-  },
-  systemQuestInstruction: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 8,
-  },
-  questTimer: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 12,
-    color: '#8B5CF6',
-    marginLeft: 8,
-  },
-  emptyQuestState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    marginTop: 12,
-    marginBottom: 12,
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#232336',
-  },
-  emptyQuestTitle: {
-    fontFamily: 'Orbitron-Bold',
-    fontSize: 16,
-    color: '#ffffff',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  emptyQuestText: {
-    fontFamily: 'Orbitron-Regular',
-    fontSize: 13,
-    color: '#9ca3af',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-});

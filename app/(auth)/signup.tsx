@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Crown, Mail, Lock, Eye, EyeOff, User, Zap, Target, Sword, Star, Shield, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Crown, Mail, Lock, Eye, EyeOff, Zap, CircleAlert as AlertCircle, Sword, Star, Shield, User } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import GlowingButton from '@/components/GlowingButton';
+import TypewriterText from '@/components/TypewriterText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { createDefaultSystemQuests } from '@/utils/supabaseStorage';
 
 type ClassType = 'berserker' | 'shinobi' | 'sage' | 'vagabond';
@@ -13,6 +15,7 @@ type FocusArea = 'business' | 'fitness' | 'intelligence';
 type AuraColor = 'red' | 'green' | 'blue';
 
 export default function SignUpScreen() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -246,15 +249,15 @@ export default function SignUpScreen() {
                     <Crown size={40} color="#ffffff" />
                   </LinearGradient>
                 </View>
-                <Text style={styles.title}>Join Awaken</Text>
-                <Text style={styles.subtitle}>Begin your journey to greatness</Text>
+                <Text style={styles.title}>{t('Join Awaken')}</Text>
+                <Text style={styles.subtitle}>{t('Begin your journey to greatness')}</Text>
               </View>
 
               {/* Error Message */}
               {error ? (
                 <View style={styles.errorContainer}>
                   <AlertCircle size={20} color="#ef4444" />
-                  <Text style={styles.errorText}>{error}</Text>
+                  <Text style={styles.errorText}>{t(error)}</Text>
                 </View>
               ) : null}
 
@@ -265,7 +268,7 @@ export default function SignUpScreen() {
                     <User size={20} color="#9ca3af" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Username"
+                      placeholder={t('Username')}
                       placeholderTextColor="#6b7280"
                       value={username}
                       onChangeText={(text) => {
@@ -284,7 +287,7 @@ export default function SignUpScreen() {
                     <Mail size={20} color="#9ca3af" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Email"
+                      placeholder={t('Email')}
                       placeholderTextColor="#6b7280"
                       value={email}
                       onChangeText={(text) => {
@@ -304,7 +307,7 @@ export default function SignUpScreen() {
                     <Lock size={20} color="#9ca3af" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Password"
+                      placeholder={t('Password')}
                       placeholderTextColor="#6b7280"
                       value={password}
                       onChangeText={(text) => {
@@ -335,7 +338,7 @@ export default function SignUpScreen() {
                     <Lock size={20} color="#9ca3af" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Confirm Password"
+                      placeholder={t('Confirm Password')}
                       placeholderTextColor="#6b7280"
                       value={confirmPassword}
                       onChangeText={(text) => {
@@ -364,11 +367,11 @@ export default function SignUpScreen() {
 
               {/* Character Customization */}
               <View style={styles.customizationSection}>
-                <Text style={styles.customizationTitle}>Choose Your Path</Text>
+                <Text style={styles.customizationTitle}>{t('Choose Your Path')}</Text>
                 
                 {/* Class Selection */}
                 <View style={styles.customizationGroup}>
-                  <Text style={styles.customizationLabel}>Class</Text>
+                  <Text style={styles.customizationLabel}>{t('Class')}</Text>
                   <View style={styles.classGrid}>
                     {classes.map((classItem) => (
                       <TouchableOpacity
@@ -395,7 +398,7 @@ export default function SignUpScreen() {
 
                 {/* Focus Area Selection */}
                 <View style={styles.customizationGroup}>
-                  <Text style={styles.customizationLabel}>Focus Area</Text>
+                  <Text style={styles.customizationLabel}>{t('Focus Area')}</Text>
                   <View style={styles.focusGrid}>
                     {focusAreas.map((focus) => (
                       <TouchableOpacity
@@ -421,7 +424,7 @@ export default function SignUpScreen() {
 
                 {/* Aura Color Selection */}
                 <View style={styles.customizationGroup}>
-                  <Text style={styles.customizationLabel}>Aura Color</Text>
+                  <Text style={styles.customizationLabel}>{t('Aura Color')}</Text>
                   <View style={styles.auraGrid}>
                     {auraColors.map((aura) => (
                       <TouchableOpacity
@@ -444,7 +447,7 @@ export default function SignUpScreen() {
               </View>
 
               <GlowingButton
-                title={loading ? "Creating Account..." : "Create Account"}
+                title={loading ? t('Creating Account...') : t('Create Account')}
                 onPress={handleSignUp}
                 variant="primary"
                 style={styles.signUpButton}
@@ -454,12 +457,12 @@ export default function SignUpScreen() {
 
               {/* Login Link */}
               <View style={styles.footer}>
-                <Text style={styles.footerText}>Already have an account?</Text>
+                <Text style={styles.footerText}>{t('Already have an account?')}</Text>
                 <TouchableOpacity 
                   onPress={() => router.push('/(auth)/login')}
                   testID="signup-login-link"
                 >
-                  <Text style={styles.loginLink}>Login</Text>
+                  <Text style={styles.loginLink}>{t('Login')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -469,7 +472,7 @@ export default function SignUpScreen() {
                 onPress={() => router.push('/test-connection')}
                 testID="signup-test-connection-button"
               >
-                <Text style={styles.testConnectionText}>Test Database Connection</Text>
+                <Text style={styles.testConnectionText}>{t('Test Database Connection')}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

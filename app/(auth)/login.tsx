@@ -7,8 +7,10 @@ import { supabase } from '@/lib/supabase';
 import GlowingButton from '@/components/GlowingButton';
 import TypewriterText from '@/components/TypewriterText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -140,9 +142,9 @@ export default function LoginScreen() {
                     <Crown size={40} color="#ffffff" />
                   </LinearGradient>
                 </View>
-                <Text style={styles.title}>Awaken</Text>
+                <Text style={styles.title}>{t('Awaken')}</Text>
                 <TypewriterText 
-                  text="System active. Awaiting directive"
+                  text={t('System active. Awaiting directive')}
                   speed={80}
                   style={styles.subtitle}
                 />
@@ -152,7 +154,7 @@ export default function LoginScreen() {
               {error ? (
                 <View style={styles.errorContainer}>
                   <AlertCircle size={20} color="#ef4444" />
-                  <Text style={styles.errorText}>{error}</Text>
+                  <Text style={styles.errorText}>{t(error)}</Text>
                 </View>
               ) : null}
 
@@ -163,7 +165,7 @@ export default function LoginScreen() {
                     <Mail size={20} color="#9ca3af" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Email"
+                      placeholder={t('Email')}
                       placeholderTextColor="#6b7280"
                       value={email}
                       onChangeText={(text) => {
@@ -183,7 +185,7 @@ export default function LoginScreen() {
                     <Lock size={20} color="#9ca3af" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Password"
+                      placeholder={t('Password')}
                       placeholderTextColor="#6b7280"
                       value={password}
                       onChangeText={(text) => {
@@ -210,7 +212,7 @@ export default function LoginScreen() {
                 </View>
 
                 <GlowingButton
-                  title={loading ? "Logging in..." : "Login"}
+                  title={loading ? t('Logging in...') : t('Login')}
                   onPress={handleLogin}
                   variant="primary"
                   style={styles.loginButton}
@@ -223,18 +225,18 @@ export default function LoginScreen() {
                   testID="login-forgot-password-button"
                   onPress={handleForgotPassword}
                 >
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                  <Text style={styles.forgotPasswordText}>{t('Forgot Password?')}</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Sign Up Link */}
               <View style={styles.footer}>
-                <Text style={styles.footerText}>Don't have an account?</Text>
+                <Text style={styles.footerText}>{t('Don\'t have an account?')}</Text>
                 <TouchableOpacity 
                   onPress={() => router.push('/(auth)/signup')}
                   testID="login-signup-link"
                 >
-                  <Text style={styles.signUpLink}>Sign Up</Text>
+                  <Text style={styles.signUpLink}>{t('Sign Up')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -242,11 +244,11 @@ export default function LoginScreen() {
               <View style={styles.featuresContainer}>
                 <View style={styles.featureItem}>
                   <Zap size={16} color="#00ffff" />
-                  <Text style={styles.featureText}>Track your progress</Text>
+                  <Text style={styles.featureText}>{t('Track your progress')}</Text>
                 </View>
                 <View style={styles.featureItem}>
                   <Crown size={16} color="#00ffff" />
-                  <Text style={styles.featureText}>Join guilds & make friends</Text>
+                  <Text style={styles.featureText}>{t('Join guilds & make friends')}</Text>
                 </View>
               </View>
 
@@ -256,7 +258,7 @@ export default function LoginScreen() {
                 onPress={() => router.push('/test-connection')}
                 testID="login-test-connection-button"
               >
-                <Text style={styles.testConnectionText}>Test Database Connection</Text>
+                <Text style={styles.testConnectionText}>{t('Test Database Connection')}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

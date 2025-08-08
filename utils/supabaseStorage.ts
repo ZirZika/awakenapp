@@ -181,6 +181,17 @@ export const updateGoal = async (goalId: string, updates: Partial<Goal>) => {
   }
 };
 
+export const deleteGoal = async (goalId: string) => {
+  const { error } = await supabase
+    .from('goals')
+    .delete()
+    .eq('id', goalId);
+  if (error) {
+    console.error('Error deleting goal:', error);
+    throw error;
+  }
+};
+
 // Tasks Functions
 export const getUserTasks = async (userId: string) => {
   const { data, error } = await supabase
@@ -383,6 +394,17 @@ export const createCoreValue = async (userId: string, value: Omit<CoreValue, 'id
   }
 
   return data;
+};
+
+export const deleteCoreValue = async (coreValueId: string) => {
+  const { error } = await supabase
+    .from('core_values')
+    .delete()
+    .eq('id', coreValueId);
+  if (error) {
+    console.error('Error deleting core value:', error);
+    throw error;
+  }
 };
 
 // Personal Achievements Functions

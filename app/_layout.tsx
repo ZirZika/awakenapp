@@ -12,8 +12,10 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { router } from 'expo-router';
-import { Image, View, StyleSheet, TouchableOpacity, Linking, Text } from 'react-native';
+import { Image, View, StyleSheet, TouchableOpacity, Linking, Text, Platform, StyleSheet as RNStyleSheet } from 'react-native';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import SidebarNavigation from '@/components/SidebarNavigation';
+import '../utils/i18n';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -84,34 +86,44 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="settings" options={{ headerShown: false }} />
-        <Stack.Screen name="inbox" options={{ headerShown: false }} />
-        <Stack.Screen name="todos" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="light" backgroundColor="#000000" />
-      
-
-      
-      {/* Made with Bolt logo overlay */}
-      <View style={styles.boltLogoContainer}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            Linking.openURL('https://bolt.new/');
-          }}
-          accessibilityLabel="Made with Bolt"
-        >
-          <Image
-            source={require('@/assets/images/logotext_poweredby_360w.png')}
-            style={styles.boltLogo}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+      <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#000' }}>
+        {Platform.OS === 'web' && <SidebarNavigation />}
+        <View style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+          <Stack screenOptions={{ 
+            headerShown: false,
+            contentStyle: { backgroundColor: 'transparent' }
+          }}>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="settings" options={{ headerShown: false }} />
+            <Stack.Screen name="inbox" options={{ headerShown: false }} />
+            <Stack.Screen name="todos" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="light" backgroundColor="#000000" />
+          {/* Made with Bolt logo overlay */}
+          <View style={styles.boltLogoContainer}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                Linking.openURL('https://bolt.new/');
+              }}
+              accessibilityLabel="Made with Bolt"
+            >
+              <Image
+                source={require('@/assets/images/logotext_poweredby_360w.png')}
+                style={styles.boltLogo}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+        {Platform.OS !== 'web' && (
+          <View style={{ ...RNStyleSheet.absoluteFillObject, zIndex: 9999, pointerEvents: 'box-none' }}>
+            <SidebarNavigation />
+          </View>
+        )}
       </View>
     </ErrorBoundary>
   );

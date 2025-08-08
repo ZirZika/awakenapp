@@ -1,6 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, View } from 'react-native';
 import { scale, scaleFont } from '../utils/config';
+import { useTranslation } from 'react-i18next';
 
 interface GlowingButtonProps {
   title: string;
@@ -10,6 +11,7 @@ interface GlowingButtonProps {
   textStyle?: TextStyle;
   disabled?: boolean;
   testID?: string;
+  icon?: React.ReactNode;
 }
 
 export default function GlowingButton({ 
@@ -19,8 +21,10 @@ export default function GlowingButton({
   style, 
   textStyle,
   disabled = false,
-  testID 
+  testID,
+  icon
 }: GlowingButtonProps) {
+  const { t } = useTranslation();
   const buttonStyle = [
     styles.button,
     styles[variant],
@@ -43,7 +47,10 @@ export default function GlowingButton({
       activeOpacity={0.8}
       testID={testID}
     >
-      <Text style={buttonTextStyle}>{title}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+        {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
+        <Text style={buttonTextStyle}>{t(title)}</Text>
+      </View>
     </TouchableOpacity>
   );
 }

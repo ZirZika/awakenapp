@@ -10,6 +10,7 @@ import Notes from '@/components/Notes';
 import PomodoroTimer from '@/components/PomodoroTimer';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import HeaderActions from '@/components/HeaderActions';
 
 export default function ToolsScreen() {
   const { user } = useAuth();
@@ -112,7 +113,7 @@ export default function ToolsScreen() {
       testID={`goals-tool-card-${tool.id}`}
     >
       <View style={styles.toolHeader}>
-        <View style={[styles.toolIconContainer, { backgroundColor: `${tool.color}20` }]}>
+        <View style={[styles.toolIconContainer, { backgroundColor: tool.color + '20' }]}>
           {tool.icon}
         </View>
         <View style={styles.toolInfo}>
@@ -159,25 +160,7 @@ export default function ToolsScreen() {
             <Text style={styles.headerTitle}>Tools</Text>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity 
-              style={styles.inboxButton}
-              onPress={() => router.push('/inbox')}
-              testID="goals-inbox-button"
-            >
-              <Mail size={20} color="#6366f1" />
-              {unreadMessages > 0 && (
-                <View style={styles.inboxBadge}>
-                  <Text style={styles.inboxBadgeText}>{unreadMessages}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingsButton}
-              onPress={() => router.push('/settings')}
-              testID="goals-settings-button"
-            >
-              <Settings size={20} color="#9ca3af" />
-            </TouchableOpacity>
+            <HeaderActions unreadMessages={unreadMessages} />
           </View>
         </View>
 

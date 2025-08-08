@@ -47,6 +47,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import GlowingButton from './GlowingButton';
+import { useTranslation } from 'react-i18next';
 
 interface DeveloperPanelProps {
   visible: boolean;
@@ -62,6 +63,7 @@ interface ComponentInfo {
 }
 
 export default function DeveloperPanel({ visible, onClose, userProfile }: DeveloperPanelProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('account');
   const [showComponentIds, setShowComponentIds] = useState(false);
@@ -74,13 +76,13 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
   const [showSensitiveData, setShowSensitiveData] = useState(false);
 
   const tabs = [
-    { id: 'account', name: 'Account', icon: User },
-    { id: 'xp', name: 'XP/Level', icon: Award },
-    { id: 'timers', name: 'Timers', icon: Clock },
-    { id: 'components', name: 'Components', icon: Code },
-    { id: 'data', name: 'Data', icon: Database },
-    { id: 'debug', name: 'Debug', icon: Bug },
-    { id: 'admin', name: 'Admin', icon: Crown },
+    { id: 'account', name: t('Account'), icon: User },
+    { id: 'xp', name: t('XP/Level'), icon: Award },
+    { id: 'timers', name: t('Timers'), icon: Clock },
+    { id: 'components', name: t('Components'), icon: Code },
+    { id: 'data', name: t('Data'), icon: Database },
+    { id: 'debug', name: t('Debug'), icon: Bug },
+    { id: 'admin', name: t('Admin'), icon: Crown },
   ];
 
   useEffect(() => {
@@ -106,12 +108,12 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
   const resetAccountToBeginner = async () => {
     Alert.alert(
-      'Reset Account',
-      'This will reset your account to beginner status. All progress will be lost. Continue?',
+      t('Reset Account'),
+      t('This will reset your account to beginner status. All progress will be lost. Continue?'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('Cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('Reset'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -139,10 +141,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
               await supabase.from('habits').delete().eq('user_id', user?.id);
               await supabase.from('notes').delete().eq('user_id', user?.id);
 
-              Alert.alert('Success', 'Account reset to beginner status!');
+              Alert.alert(t('Success'), t('Account reset to beginner status!'));
             } catch (error) {
               console.error('Error resetting account:', error);
-              Alert.alert('Error', 'Failed to reset account');
+              Alert.alert(t('Error'), t('Failed to reset account'));
             }
           },
         },
@@ -154,7 +156,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
     try {
       const xp = parseInt(xpAmount);
       if (isNaN(xp) || xp <= 0) {
-        Alert.alert('Invalid XP', 'Please enter a valid positive number');
+        Alert.alert(t('Invalid XP'), t('Please enter a valid positive number'));
         return;
       }
 
@@ -168,10 +170,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
       if (error) throw error;
 
-      Alert.alert('Success', `Added ${xp} XP!`);
+      Alert.alert(t('Success'), `${xp}${t(' XP!')}`);
     } catch (error) {
       console.error('Error adding XP:', error);
-      Alert.alert('Error', 'Failed to add XP');
+      Alert.alert(t('Error'), t('Failed to add XP'));
     }
   };
 
@@ -179,7 +181,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
     try {
       const level = parseInt(levelAmount);
       if (isNaN(level) || level < 1 || level > 100) {
-        Alert.alert('Invalid Level', 'Please enter a level between 1 and 100');
+        Alert.alert(t('Invalid Level'), t('Please enter a level between 1 and 100'));
         return;
       }
 
@@ -190,10 +192,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
       if (error) throw error;
 
-      Alert.alert('Success', `Level set to ${level}!`);
+      Alert.alert(t('Success'), `${level}${t(' Level!')}`);
     } catch (error) {
       console.error('Error setting level:', error);
-      Alert.alert('Error', 'Failed to set level');
+      Alert.alert(t('Error'), t('Failed to set level'));
     }
   };
 
@@ -201,7 +203,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
     try {
       const streak = parseInt(streakAmount);
       if (isNaN(streak) || streak < 0) {
-        Alert.alert('Invalid Streak', 'Please enter a valid positive number');
+        Alert.alert(t('Invalid Streak'), t('Please enter a valid positive number'));
         return;
       }
 
@@ -212,10 +214,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
       if (error) throw error;
 
-      Alert.alert('Success', `Streak set to ${streak}!`);
+      Alert.alert(t('Success'), `${streak}${t(' Streak!')}`);
     } catch (error) {
       console.error('Error setting streak:', error);
-      Alert.alert('Error', 'Failed to set streak');
+      Alert.alert(t('Error'), t('Failed to set streak'));
     }
   };
 
@@ -233,10 +235,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
       if (error) throw error;
 
-      Alert.alert('Success', 'All timers reset!');
+      Alert.alert(t('Success'), t('All timers reset!'));
     } catch (error) {
       console.error('Error resetting timers:', error);
-      Alert.alert('Error', 'Failed to reset timers');
+      Alert.alert(t('Error'), t('Failed to reset timers'));
     }
   };
 
@@ -244,7 +246,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
     try {
       const minutes = parseInt(timerMinutes);
       if (isNaN(minutes) || minutes <= 0) {
-        Alert.alert('Invalid Duration', 'Please enter a valid positive number');
+        Alert.alert(t('Invalid Duration'), t('Please enter a valid positive number'));
         return;
       }
 
@@ -258,10 +260,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
       if (error) throw error;
 
-      Alert.alert('Success', `Timer duration set to ${minutes} minutes!`);
+      Alert.alert(t('Success'), `${minutes}${t(' Timer duration!')}`);
     } catch (error) {
       console.error('Error setting timer duration:', error);
-      Alert.alert('Error', 'Failed to set timer duration');
+      Alert.alert(t('Error'), t('Failed to set timer duration'));
     }
   };
 
@@ -270,14 +272,14 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
       // Generate test goals
       const testGoals = [
         {
-          title: 'Test Goal 1',
-          description: 'This is a test goal for development',
+          title: t('Test Goal 1'),
+          description: t('This is a test goal for development'),
           category: 'test',
           user_id: user?.id,
         },
         {
-          title: 'Test Goal 2',
-          description: 'Another test goal',
+          title: t('Test Goal 2'),
+          description: t('Another test goal'),
           category: 'test',
           user_id: user?.id,
         },
@@ -292,8 +294,8 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
       // Generate test tasks
       const testTasks = [
         {
-          title: 'Test Task 1',
-          description: 'This is a test task',
+          title: t('Test Task 1'),
+          description: t('This is a test task'),
           xp_reward: 50,
           difficulty: 'Easy',
           quest_type: 'system',
@@ -301,8 +303,8 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
           user_id: user?.id,
         },
         {
-          title: 'Test Task 2',
-          description: 'Another test task',
+          title: t('Test Task 2'),
+          description: t('Another test task'),
           xp_reward: 100,
           difficulty: 'Medium',
           quest_type: 'system',
@@ -317,21 +319,21 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
       if (tasksError) throw tasksError;
 
-      Alert.alert('Success', 'Test data generated!');
+      Alert.alert(t('Success'), t('Test data generated!'));
     } catch (error) {
       console.error('Error generating test data:', error);
-      Alert.alert('Error', 'Failed to generate test data');
+      Alert.alert(t('Error'), t('Failed to generate test data'));
     }
   };
 
   const clearAllData = async () => {
     Alert.alert(
-      'Clear All Data',
-      'This will delete ALL your data. This action cannot be undone. Continue?',
+      t('Clear All Data'),
+      t('This will delete ALL your data. This action cannot be undone. Continue?'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('Cancel'), style: 'cancel' },
         {
-          text: 'Clear All',
+          text: t('Clear All'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -343,10 +345,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
               await supabase.from('habits').delete().eq('user_id', user?.id);
               await supabase.from('notes').delete().eq('user_id', user?.id);
 
-              Alert.alert('Success', 'All data cleared!');
+              Alert.alert(t('Success'), t('All data cleared!'));
             } catch (error) {
               console.error('Error clearing data:', error);
-              Alert.alert('Error', 'Failed to clear data');
+              Alert.alert(t('Error'), t('Failed to clear data'));
             }
           },
         },
@@ -356,47 +358,47 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
   const renderAccountTab = () => (
     <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Account Management</Text>
+      <Text style={styles.sectionTitle}>{t('Account Management')}</Text>
       
       <GlowingButton
-        title="Reset to Beginner"
+        title={t('Reset to Beginner')}
         onPress={resetAccountToBeginner}
         icon={RotateCcw}
         style={styles.dangerButton}
       />
 
       <GlowingButton
-        title="Generate Test Data"
+        title={t('Generate Test Data')}
         onPress={generateTestData}
         icon={Plus}
         style={styles.button}
       />
 
       <GlowingButton
-        title="Clear All Data"
+        title={t('Clear All Data')}
         onPress={clearAllData}
         icon={Trash2}
         style={styles.dangerButton}
       />
 
       <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>Current Account Info:</Text>
-        <Text style={styles.infoText}>Role: {userProfile?.role || 'user'}</Text>
-        <Text style={styles.infoText}>Level: {userProfile?.level || 1}</Text>
-        <Text style={styles.infoText}>XP: {userProfile?.current_xp || 0}</Text>
-        <Text style={styles.infoText}>Streak: {userProfile?.streak || 0}</Text>
-        <Text style={styles.infoText}>Tasks Completed: {userProfile?.tasks_completed || 0}</Text>
-        <Text style={styles.infoText}>Goals Completed: {userProfile?.goals_completed || 0}</Text>
+        <Text style={styles.infoTitle}>{t('Current Account Info')}:</Text>
+        <Text style={styles.infoText}>{t('Role')}: {userProfile?.role || t('user')}</Text>
+        <Text style={styles.infoText}>{t('Level')}: {userProfile?.level || 1}</Text>
+        <Text style={styles.infoText}>{t('XP')}: {userProfile?.current_xp || 0}</Text>
+        <Text style={styles.infoText}>{t('Streak')}: {userProfile?.streak || 0}</Text>
+        <Text style={styles.infoText}>{t('Tasks Completed')}: {userProfile?.tasks_completed || 0}</Text>
+        <Text style={styles.infoText}>{t('Goals Completed')}: {userProfile?.goals_completed || 0}</Text>
       </View>
     </View>
   );
 
   const renderXPTab = () => (
     <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>XP & Level Management</Text>
+      <Text style={styles.sectionTitle}>{t('XP & Level Management')}</Text>
       
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Add XP:</Text>
+        <Text style={styles.inputLabel}>{t('Add XP')}:</Text>
         <TextInput
           style={styles.input}
           value={xpAmount}
@@ -405,7 +407,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
           placeholder="100"
         />
         <GlowingButton
-          title="Add XP"
+          title={t('Add XP')}
           onPress={addXP}
           icon={Plus}
           style={styles.button}
@@ -413,7 +415,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Set Level:</Text>
+        <Text style={styles.inputLabel}>{t('Set Level')}:</Text>
         <TextInput
           style={styles.input}
           value={levelAmount}
@@ -422,7 +424,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
           placeholder="1"
         />
         <GlowingButton
-          title="Set Level"
+          title={t('Set Level')}
           onPress={setLevel}
           icon={Target}
           style={styles.button}
@@ -430,7 +432,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Set Streak:</Text>
+        <Text style={styles.inputLabel}>{t('Set Streak')}:</Text>
         <TextInput
           style={styles.input}
           value={streakAmount}
@@ -439,7 +441,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
           placeholder="1"
         />
         <GlowingButton
-          title="Set Streak"
+          title={t('Set Streak')}
           onPress={setStreak}
           icon={TrendingUp}
           style={styles.button}
@@ -450,17 +452,17 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
   const renderTimersTab = () => (
     <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Timer Management</Text>
+      <Text style={styles.sectionTitle}>{t('Timer Management')}</Text>
       
       <GlowingButton
-        title="Reset All Timers"
+        title={t('Reset All Timers')}
         onPress={resetTimers}
         icon={RotateCcw}
         style={styles.button}
       />
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Set Timer Duration (minutes):</Text>
+        <Text style={styles.inputLabel}>{t('Set Timer Duration (minutes)')}:</Text>
         <TextInput
           style={styles.input}
           value={timerMinutes}
@@ -469,7 +471,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
           placeholder="25"
         />
         <GlowingButton
-          title="Set Duration"
+          title={t('Set Duration')}
           onPress={setTimerDuration}
           icon={Clock}
           style={styles.button}
@@ -480,10 +482,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
   const renderComponentsTab = () => (
     <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Component Debugging</Text>
+      <Text style={styles.sectionTitle}>{t('Component Debugging')}</Text>
       
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Show Component IDs</Text>
+        <Text style={styles.toggleLabel}>{t('Show Component IDs')}</Text>
         <Switch
           value={showComponentIds}
           onValueChange={setShowComponentIds}
@@ -493,12 +495,12 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
       </View>
 
       <View style={styles.componentList}>
-        <Text style={styles.componentTitle}>Registered Components:</Text>
+        <Text style={styles.componentTitle}>{t('Registered Components')}:</Text>
         {componentIds.map((component) => (
           <View key={component.id} style={styles.componentItem}>
             <Text style={styles.componentName}>{component.name}</Text>
-            <Text style={styles.componentId}>ID: {component.id}</Text>
-            <Text style={styles.componentType}>Type: {component.type}</Text>
+            <Text style={styles.componentId}>{t('ID')}: {component.id}</Text>
+            <Text style={styles.componentType}>{t('Type')}: {component.type}</Text>
           </View>
         ))}
       </View>
@@ -507,10 +509,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
   const renderDataTab = () => (
     <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Data Management</Text>
+      <Text style={styles.sectionTitle}>{t('Data Management')}</Text>
       
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Show Sensitive Data</Text>
+        <Text style={styles.toggleLabel}>{t('Show Sensitive Data')}</Text>
         <Switch
           value={showSensitiveData}
           onValueChange={setShowSensitiveData}
@@ -521,16 +523,16 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
       {showSensitiveData && (
         <View style={styles.sensitiveData}>
-          <Text style={styles.dataTitle}>User ID:</Text>
+          <Text style={styles.dataTitle}>{t('User ID')}:</Text>
           <Text style={styles.dataValue}>{user?.id}</Text>
           
-          <Text style={styles.dataTitle}>Email:</Text>
+          <Text style={styles.dataTitle}>{t('Email')}:</Text>
           <Text style={styles.dataValue}>{user?.email}</Text>
           
-          <Text style={styles.dataTitle}>Profile ID:</Text>
+          <Text style={styles.dataTitle}>{t('Profile ID')}:</Text>
           <Text style={styles.dataValue}>{userProfile?.id}</Text>
           
-          <Text style={styles.dataTitle}>Role:</Text>
+          <Text style={styles.dataTitle}>{t('Role')}:</Text>
           <Text style={styles.dataValue}>{userProfile?.role}</Text>
         </View>
       )}
@@ -539,10 +541,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
   const renderDebugTab = () => (
     <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Debug Tools</Text>
+      <Text style={styles.sectionTitle}>{t('Debug Tools')}</Text>
       
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Debug Mode</Text>
+        <Text style={styles.toggleLabel}>{t('Debug Mode')}</Text>
         <Switch
           value={debugMode}
           onValueChange={setDebugMode}
@@ -552,15 +554,15 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
       </View>
 
       <GlowingButton
-        title="Test Database Connection"
+        title={t('Test Database Connection')}
         onPress={async () => {
           try {
             const { data, error } = await supabase.from('profiles').select('id').limit(1);
             if (error) throw error;
-            Alert.alert('Success', 'Database connection working!');
+            Alert.alert(t('Success'), t('Database connection working!'));
           } catch (error) {
             console.error('Database test error:', error);
-            Alert.alert('Error', 'Database connection failed');
+            Alert.alert(t('Error'), t('Database connection failed'));
           }
         }}
         icon={Database}
@@ -568,10 +570,10 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
       />
 
       <GlowingButton
-        title="Clear Console Logs"
+        title={t('Clear Console Logs')}
         onPress={() => {
           console.clear();
-          Alert.alert('Success', 'Console logs cleared!');
+          Alert.alert(t('Success'), t('Console logs cleared!'));
         }}
         icon={Trash2}
         style={styles.button}
@@ -581,32 +583,32 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
 
   const renderAdminTab = () => (
     <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Admin Tools</Text>
+      <Text style={styles.sectionTitle}>{t('Admin Tools')}</Text>
       
       {userProfile?.role === 'admin' ? (
         <>
           <GlowingButton
-            title="View All Users"
+            title={t('View All Users')}
             onPress={() => {
-              Alert.alert('Admin Feature', 'View all users functionality would go here');
+              Alert.alert(t('Admin Feature'), t('View all users functionality would go here'));
             }}
             icon={Users}
             style={styles.button}
           />
 
           <GlowingButton
-            title="System Statistics"
+            title={t('System Statistics')}
             onPress={() => {
-              Alert.alert('Admin Feature', 'System statistics would go here');
+              Alert.alert(t('Admin Feature'), t('System statistics would go here'));
             }}
             icon={BarChart3}
             style={styles.button}
           />
 
           <GlowingButton
-            title="Database Backup"
+            title={t('Database Backup')}
             onPress={() => {
-              Alert.alert('Admin Feature', 'Database backup functionality would go here');
+              Alert.alert(t('Admin Feature'), t('Database backup functionality would go here'));
             }}
             icon={Shield}
             style={styles.button}
@@ -614,7 +616,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
         </>
       ) : (
         <Text style={styles.noAccessText}>
-          Admin access required. Current role: {userProfile?.role}
+          {t('Admin access required. Current role')}: {userProfile?.role}
         </Text>
       )}
     </View>
@@ -660,7 +662,7 @@ export default function DeveloperPanel({ visible, onClose, userProfile }: Develo
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Code size={24} color="#fff" />
-              <Text style={styles.headerTitle}>Developer Panel</Text>
+              <Text style={styles.headerTitle}>{t('Developer Panel')}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={24} color="#fff" />

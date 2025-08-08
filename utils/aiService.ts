@@ -53,7 +53,7 @@ export class AIService {
           messages: [
             {
               role: "system",
-              content: `You are an AI life coach and quest generator for a gamified personal development app called "LevelUpLife". 
+              content: `You are an AI life coach and quest generator for a gamified personal development app called "Awaken". 
               Your role is to analyze user data and generate personalized quests that help users achieve their goals and improve their lives.
               
               Guidelines:
@@ -161,7 +161,7 @@ export class AIService {
     const location = recentEntries.length > 0 && recentEntries[0].content ? (recentEntries[0].content.match(/\b(in|at|from|to) ([A-Z][a-zA-Z]+)/)?.[2] || '') : '';
     const tomorrowsGoals = recentEntries.map(e => e.tomorrowGoals).filter(Boolean).join(', ');
 
-    return `You are an AI life coach and quest generator for a gamified personal development app called "LevelUpLife".
+    return `You are an AI life coach and quest generator for a gamified personal development app called "Awaken".
 
 Your job is to generate 3-5 highly specific, actionable, and personalized quests for the user based on their actual data. DO NOT generate generic or vague quests. Use the user's goals, journal entries, tomorrow's goals, and any context clues (such as location or recent life changes) to make each quest unique and relevant.
 

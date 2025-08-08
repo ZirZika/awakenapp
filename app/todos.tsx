@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { X, Plus, CircleCheck as CheckCircle2, Circle, CreditCard as Edit3, Trash2, Search, Filter, Calendar, Clock } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GlowingButton from '@/components/GlowingButton';
+import { useTranslation } from 'react-i18next';
 
 interface PersonalTodo {
   id: string;
@@ -19,6 +20,7 @@ interface PersonalTodo {
 }
 
 export default function TodosScreen() {
+  const { t } = useTranslation();
   const [todos, setTodos] = useState<PersonalTodo[]>([]);
   const [filteredTodos, setFilteredTodos] = useState<PersonalTodo[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -377,7 +379,7 @@ export default function TodosScreen() {
             >
               <X size={24} color="#ffffff" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>All To-Dos</Text>
+            <Text style={styles.headerTitle}>{t('All To-Dos')}</Text>
           </View>
           <TouchableOpacity 
             style={styles.addButton}
@@ -392,19 +394,19 @@ export default function TodosScreen() {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{pendingCount}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={styles.statLabel}>{t('Pending')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={[styles.statNumber, { color: '#f59e0b' }]}>{todayCount}</Text>
-            <Text style={styles.statLabel}>Due Today</Text>
+            <Text style={styles.statLabel}>{t('Due Today')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={[styles.statNumber, { color: '#ef4444' }]}>{overdueCount}</Text>
-            <Text style={styles.statLabel}>Overdue</Text>
+            <Text style={styles.statLabel}>{t('Overdue')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={[styles.statNumber, { color: '#10b981' }]}>{completedCount}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
+            <Text style={styles.statLabel}>{t('Completed')}</Text>
           </View>
         </View>
 
@@ -414,7 +416,7 @@ export default function TodosScreen() {
             <Search size={16} color="#9ca3af" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search to-dos..."
+              placeholder={t('Search to-dos...')}
               placeholderTextColor="#6b7280"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -446,8 +448,8 @@ export default function TodosScreen() {
                   styles.filterChipText,
                   selectedFilter === filter && styles.activeFilterChipText
                 ]}>
-                  {filter === 'today' ? 'Due Today' : 
-                   filter === 'overdue' ? 'Overdue' :
+                  {filter === 'today' ? t('Due Today') : 
+                   filter === 'overdue' ? t('Overdue') :
                    filter.charAt(0).toUpperCase() + filter.slice(1)}
                 </Text>
               </TouchableOpacity>
@@ -480,11 +482,11 @@ export default function TodosScreen() {
           {filteredTodos.length === 0 ? (
             <View style={styles.emptyState}>
               <CheckCircle2 size={64} color="#374151" />
-              <Text style={styles.emptyTitle}>No To-Dos Found</Text>
+              <Text style={styles.emptyTitle}>{t('No To-Dos Found')}</Text>
               <Text style={styles.emptySubtitle}>
                 {searchQuery || selectedFilter !== 'all' || selectedCategory !== 'All'
-                  ? 'Try adjusting your filters or search terms.'
-                  : 'Create your first to-do to get started!'
+                  ? t('Try adjusting your filters or search terms.')
+                  : t('Create your first to-do to get started!')
                 }
               </Text>
             </View>
@@ -531,8 +533,8 @@ export default function TodosScreen() {
                         )}
                         <Text style={styles.dateText}>
                           {todo.completed && todo.completedAt 
-                            ? `Completed ${formatDate(todo.completedAt)}`
-                            : `Created ${formatDate(todo.createdAt)}`
+                            ? t('Completed') + ' ' + formatDate(todo.completedAt)
+                            : t('Created') + ' ' + formatDate(todo.createdAt)
                           }
                         </Text>
                       </View>
@@ -587,7 +589,7 @@ export default function TodosScreen() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
-                  {showEditModal ? 'Edit To-Do' : 'Add New To-Do'}
+                  {showEditModal ? t('Edit To-Do') : t('Add New To-Do')}
                 </Text>
                 <TouchableOpacity 
                   style={styles.modalCloseButton}
@@ -609,10 +611,10 @@ export default function TodosScreen() {
               
               <ScrollView style={styles.modalBody}>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Title *</Text>
+                  <Text style={styles.inputLabel}>{t('Title')} *</Text>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="What do you need to do?"
+                    placeholder={t('What do you need to do?')}
                     placeholderTextColor="#6b7280"
                     value={newTodoTitle}
                     onChangeText={setNewTodoTitle}
@@ -622,10 +624,10 @@ export default function TodosScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Description</Text>
+                  <Text style={styles.inputLabel}>{t('Description')}</Text>
                   <TextInput
                     style={[styles.textInput, styles.textArea]}
-                    placeholder="Add more details..."
+                    placeholder={t('Add more details...')}
                     placeholderTextColor="#6b7280"
                     value={newTodoDescription}
                     onChangeText={setNewTodoDescription}
@@ -636,7 +638,7 @@ export default function TodosScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Due Date</Text>
+                  <Text style={styles.inputLabel}>{t('Due Date')}</Text>
                   <View style={styles.dateInputContainer}>
                     <TextInput
                       style={styles.dateInput}
@@ -652,28 +654,28 @@ export default function TodosScreen() {
                         onPress={() => setNewTodoDueDate(getDatePreset('today'))}
                         testID="todos-modal-date-preset-today"
                       >
-                        <Text style={styles.datePresetText}>Today</Text>
+                        <Text style={styles.datePresetText}>{t('Today')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.datePresetButton}
                         onPress={() => setNewTodoDueDate(getDatePreset('tomorrow'))}
                         testID="todos-modal-date-preset-tomorrow"
                       >
-                        <Text style={styles.datePresetText}>Tomorrow</Text>
+                        <Text style={styles.datePresetText}>{t('Tomorrow')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.datePresetButton}
                         onPress={() => setNewTodoDueDate(getDatePreset('next-week'))}
                         testID="todos-modal-date-preset-next-week"
                       >
-                        <Text style={styles.datePresetText}>Next Week</Text>
+                        <Text style={styles.datePresetText}>{t('Next Week')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Priority</Text>
+                  <Text style={styles.inputLabel}>{t('Priority')}</Text>
                   <View style={styles.prioritySelector}>
                     {priorities.map(priority => (
                       <TouchableOpacity
@@ -698,7 +700,7 @@ export default function TodosScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Category</Text>
+                  <Text style={styles.inputLabel}>{t('Category')}</Text>
                   <View style={styles.categorySelector}>
                     {categories.filter(cat => cat !== 'All').map(category => (
                       <TouchableOpacity
@@ -724,7 +726,7 @@ export default function TodosScreen() {
               
               <View style={styles.modalActions}>
                 <GlowingButton
-                  title="Cancel"
+                  title={t('Cancel')}
                   onPress={() => {
                     setShowAddModal(false);
                     setShowEditModal(false);
@@ -740,7 +742,7 @@ export default function TodosScreen() {
                   testID="todos-modal-cancel-button"
                 />
                 <GlowingButton
-                  title={showEditModal ? 'Save Changes' : 'Add To-Do'}
+                  title={showEditModal ? t('Save Changes') : t('Add To-Do')}
                   onPress={showEditModal ? editTodo : addTodo}
                   variant="primary"
                   style={styles.modalButton}
@@ -761,9 +763,9 @@ export default function TodosScreen() {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.deleteModalContent}>
-              <Text style={styles.deleteModalTitle}>Delete To-Do</Text>
+              <Text style={styles.deleteModalTitle}>{t('Delete To-Do')}</Text>
               <Text style={styles.deleteModalMessage}>
-                Are you sure you want to delete "{todoToDelete?.title}"? This action cannot be undone.
+                {t('Are you sure you want to delete')} "{todoToDelete?.title}"? {t('This action cannot be undone.')}
               </Text>
               <View style={styles.deleteModalActions}>
                 <TouchableOpacity 
@@ -774,14 +776,14 @@ export default function TodosScreen() {
                   }}
                   testID="todos-delete-modal-cancel-button"
                 >
-                  <Text style={styles.deleteModalButtonText}>Cancel</Text>
+                  <Text style={styles.deleteModalButtonText}>{t('Cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.deleteModalButtonDelete}
                   onPress={confirmDelete}
                   testID="todos-delete-modal-confirm-button"
                 >
-                  <Text style={styles.deleteModalButtonText}>Delete</Text>
+                  <Text style={styles.deleteModalButtonText}>{t('Delete')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
