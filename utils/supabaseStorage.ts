@@ -1425,3 +1425,83 @@ export const getUserCompletedQuests = async (userId: string) => {
     createdAt: quest.created_at,
   }));
 };
+
+// ============================================================================
+// QUEST BOARD FUNCTIONS
+// ============================================================================
+
+export const getQuestBoardQuests = async () => {
+  const { data, error } = await supabase
+    .from('quest_board')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching quest board quests:', error);
+    return [];
+  }
+
+  return data;
+};
+
+export const acceptQuestBoardQuest = async (userId: string, questId: string) => {
+  const { data, error } = await supabase
+    .from('quest_board_accepts')
+    .insert({
+      quest_id: questId,
+      user_id: userId,
+      status: 'accepted',
+      accepted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error accepting quest board quest:', error);
+    throw error;
+  }
+
+  // Increment accept count
+  await supabase
+    .from('quest_board')
+    .update({ current_accepts: supabase.sql`current_accepts + 1` })
+    .eq('id', questId);
+
+  return data;
+};
+
+export const abandonQuestBoardQuest = async (userId: string, questId: string) => {
+  const { error } = await supabase
+    .from('quest_board_accepts')
+    .update({
+      status: 'abandoned',
+      abandoned_at: new Date().toISOString(),
+    })
+    .eq('quest_id', questId)
+    .eq('user_id', userId)
+    .eq('status', 'accepted');
+
+  if (error) {
+    console.error('Error abandoning quest board quest:', error);
+    throw error;
+  }
+};
+
+export const getUserQuestBoardAccepts = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('quest_board_accepts')
+    .select(`
+      *,
+      quest:quest_board(*)
+    `)
+    .eq('user_id', userId)
+    .eq('status', 'accepted');
+
+  if (error) {
+    console.error('Error fetching user quest board accepts:', error);
+    return [];
+  }
+
+  return data;
+};
